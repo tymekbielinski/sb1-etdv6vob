@@ -1,0 +1,70 @@
+import { lazy, Suspense } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from '@/components/theme-provider';
+import { Toaster } from '@/components/ui/sonner';
+import { AuthProvider } from '@/components/auth/auth-provider';
+import { AuthTabs } from '@/components/auth/auth-tabs';
+import { useAuth } from '@/components/auth/auth-provider';
+import { LoadingScreen } from '@/components/loading-screen';
+
+// Lazy load components
+const Layout = lazy(() => import('@/components/layout'));
+const Dashboard = lazy(() => import('@/pages/dashboard'));
+const Opportunities = lazy(() => import('@/pages/opportunities'));
+const TeamSettings = lazy(() => import('@/pages/team-settings'));
+const ActivityLog = lazy(() => import('@/pages/activity-log'));
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+}
+
+function AppRoutes() {
+  const { user } = useAuth();
+
+  // Redirect to dashboard if already logged in
+  if (user && window.location.pathname === '/login') {
+    return <Navigate to="/" replace />;
+  }
+
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        <Route path="/login" element={<AuthTabs />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="opportunities" element={<Opportunities />} />
+          <Route path="team" element={<TeamSettings />} />
+          <Route path="activity" element={<ActivityLog />} />
+        </Route>
+      </Routes>
+    </Suspense>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider defaultTheme="dark">
+      <Router>
+        <AuthProvider>
+          <AppRoutes />
+          <Toaster />
+        </AuthProvider>
+      </Router>
+    </ThemeProvider>
+  );
+}
+
+export default App
