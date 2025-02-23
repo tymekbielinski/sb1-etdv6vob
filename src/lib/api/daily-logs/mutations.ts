@@ -38,11 +38,12 @@ export async function createOrUpdateDailyLog(data: Partial<DailyLogEntry> & { us
     if (teamError) throw new Error('Failed to verify team membership');
     if (!teamData) throw new Error('Team not found');
 
-    // Check if a log exists for today
+    // Check if a log exists for the specified date
     const { data: existingLog, error: fetchError } = await supabase
       .from('daily_logs')
       .select('*')
       .eq('user_id', data.user_id)
+      .eq('team_id', data.team_id)
       .eq('date', data.date)
       .maybeSingle();
 
@@ -98,57 +99,25 @@ export async function createOrUpdateDailyLog(data: Partial<DailyLogEntry> & { us
   }
 }
 
-export async function getTodaysLog(userId: string, teamId: string) {
+export async function getDailyLog(userId: string, teamId: string, date: string) {
   try {
-    // Get current user's email
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError) throw userError;
-    if (!user?.email) throw new Error('User email not found');
-
-    // Verify team access using email-based check
-    const { data: teamData, error: teamError } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('id', teamId)
-      .or(`user_id.eq.${user.id},team_members.cs.{${user.email}}`)
-      .single();
-
-    if (teamError) throw new Error('Failed to verify team membership');
-    if (!teamData) throw new Error('Team not found');
-
-    const today = new Date().toISOString().split('T')[0];
-    
     const { data, error } = await supabase
       .from('daily_logs')
       .select('*')
       .eq('user_id', userId)
-      .eq('team_id', teamData.id)
-      .eq('date', today)
+      .eq('team_id', teamId)
+      .eq('date', date)
       .maybeSingle();
 
     if (error) throw error;
-
-    return data || {
-      cold_calls: 0,
-      text_messages: 0,
-      facebook_dms: 0,
-      linkedin_dms: 0,
-      instagram_dms: 0,
-      cold_emails: 0,
-      quotes: 0,
-      booked_calls: 0,
-      completed_calls: 0,
-      booked_presentations: 0,
-      completed_presentations: 0,
-      submitted_applications: 0,
-      deals_won: 0,
-      deal_value: 0,
-      user_id: userId,
-      team_id: teamData.id,
-      date: today
-    };
+    return data;
   } catch (error) {
-    console.error('Error in getTodaysLog:', error);
+    console.error('Error in getDailyLog:', error);
     throw error;
   }
+}
+
+export async function getTodaysLog(userId: string, teamId: string) {
+  const today = new Date().toISOString().split('T')[0];
+  return getDailyLog(userId, teamId, today);
 }

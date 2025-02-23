@@ -3,9 +3,14 @@ import { Phone, MessageSquare, Facebook, Linkedin, Instagram, Mail } from 'lucid
 import { MetricCard } from '@/components/metrics/metric-card';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useTeamStore } from '@/lib/store/team-store';
-import { getTodaysLog } from '@/lib/api/daily-logs/mutations';
+import { getDailyLog } from '@/lib/api/daily-logs/mutations';
+import { format } from 'date-fns';
 
-export function TodayMetrics() {
+interface TodayMetricsProps {
+  selectedDate: Date;
+}
+
+export function TodayMetrics({ selectedDate }: TodayMetricsProps) {
   const [metrics, setMetrics] = useState({
     coldCalls: 0,
     textMessages: 0,
@@ -19,11 +24,12 @@ export function TodayMetrics() {
   const { team } = useTeamStore();
 
   useEffect(() => {
-    async function loadTodaysMetrics() {
+    async function loadMetrics() {
       if (!user?.id || !team?.id) return;
 
       try {
-        const log = await getTodaysLog(user.id, team.id);
+        setIsLoading(true);
+        const log = await getDailyLog(user.id, team.id, format(selectedDate, 'yyyy-MM-dd'));
         if (log) {
           setMetrics({
             coldCalls: log.cold_calls,
@@ -33,19 +39,28 @@ export function TodayMetrics() {
             instagramDms: log.instagram_dms,
             coldEmails: log.cold_emails,
           });
+        } else {
+          setMetrics({
+            coldCalls: 0,
+            textMessages: 0,
+            facebookDms: 0,
+            linkedinDms: 0,
+            instagramDms: 0,
+            coldEmails: 0,
+          });
         }
       } catch (error) {
-        console.error('Error loading today\'s metrics:', error);
+        console.error('Error loading metrics:', error);
       } finally {
         setIsLoading(false);
       }
     }
 
-    loadTodaysMetrics();
-  }, [user?.id, team?.id]);
+    loadMetrics();
+  }, [user?.id, team?.id, selectedDate]);
 
   if (isLoading) {
-    return <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+    return <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {[...Array(6)].map((_, i) => (
         <div key={i} className="h-24 rounded-lg bg-muted animate-pulse" />
       ))}
@@ -53,7 +68,7 @@ export function TodayMetrics() {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <MetricCard
         title="Cold Calls"
         value={metrics.coldCalls.toString()}

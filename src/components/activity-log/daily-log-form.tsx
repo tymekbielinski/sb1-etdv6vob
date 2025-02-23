@@ -16,7 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useTeamStore } from '@/lib/store/team-store';
-import { createOrUpdateDailyLog, getTodaysLog } from '@/lib/api/daily-logs/mutations';
+import { createOrUpdateDailyLog, getDailyLog } from '@/lib/api/daily-logs/mutations';
+import { format } from 'date-fns';
 
 const formSchema = z.object({
   coldCalls: z.number().min(0, 'Must be 0 or greater'),
@@ -31,9 +32,10 @@ type FormData = z.infer<typeof formSchema>;
 
 interface DailyLogFormProps {
   onLogUpdated?: () => void;
+  selectedDate: Date;
 }
 
-export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
+export function DailyLogForm({ onLogUpdated, selectedDate }: DailyLogFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const { user } = useAuth();
@@ -53,11 +55,11 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
   });
 
   useEffect(() => {
-    async function loadTodaysLog() {
+    async function loadDailyLog() {
       if (!user?.id || !team?.id) return;
 
       try {
-        const log = await getTodaysLog(user.id, team.id);
+        const log = await getDailyLog(user.id, team.id, format(selectedDate, 'yyyy-MM-dd'));
         if (log) {
           form.reset({
             coldCalls: log.cold_calls,
@@ -68,14 +70,24 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
             coldEmails: log.cold_emails,
           });
           setLastUpdated(new Date(log.created_at).toLocaleTimeString());
+        } else {
+          form.reset({
+            coldCalls: 0,
+            textMessages: 0,
+            facebookDms: 0,
+            linkedinDms: 0,
+            instagramDms: 0,
+            coldEmails: 0,
+          });
+          setLastUpdated(null);
         }
       } catch (error) {
-        console.error('Error loading today\'s log:', error);
+        console.error('Error loading daily log:', error);
       }
     }
 
-    loadTodaysLog();
-  }, [user?.id, team?.id, form]);
+    loadDailyLog();
+  }, [user?.id, team?.id, selectedDate, form]);
 
   const onSubmit = async (values: FormData) => {
     if (!user?.id || !team?.id) {
@@ -98,16 +110,15 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
         cold_emails: values.coldEmails,
         user_id: user.id,
         team_id: team.id,
-        date: new Date().toISOString().split('T')[0],
+        date: format(selectedDate, 'yyyy-MM-dd'),
       });
 
       setLastUpdated(new Date().toLocaleTimeString());
       toast({
         title: 'Success',
-        description: 'Activity log has been saved',
+        description: `Activity log saved for ${format(selectedDate, 'PPP')}`,
       });
       
-      // Notify parent component that log was updated
       onLogUpdated?.();
     } catch (error) {
       console.error('Error saving log:', error);
@@ -125,7 +136,7 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Today's Activity Log</span>
+          <span>Activity Log for {format(selectedDate, 'PPP')}</span>
           {lastUpdated && (
             <span className="text-sm font-normal text-muted-foreground">
               Last updated: {lastUpdated}
@@ -146,9 +157,10 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
                     <FormControl>
                       <Input
                         type="number"
-                        min="0"
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        onChange={(e) =>
+                          field.onChange(e.target.valueAsNumber || 0)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -164,9 +176,10 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
                     <FormControl>
                       <Input
                         type="number"
-                        min="0"
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        onChange={(e) =>
+                          field.onChange(e.target.valueAsNumber || 0)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -182,9 +195,10 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
                     <FormControl>
                       <Input
                         type="number"
-                        min="0"
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        onChange={(e) =>
+                          field.onChange(e.target.valueAsNumber || 0)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -200,9 +214,10 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
                     <FormControl>
                       <Input
                         type="number"
-                        min="0"
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        onChange={(e) =>
+                          field.onChange(e.target.valueAsNumber || 0)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -218,9 +233,10 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
                     <FormControl>
                       <Input
                         type="number"
-                        min="0"
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        onChange={(e) =>
+                          field.onChange(e.target.valueAsNumber || 0)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -236,9 +252,10 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
                     <FormControl>
                       <Input
                         type="number"
-                        min="0"
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        onChange={(e) =>
+                          field.onChange(e.target.valueAsNumber || 0)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -247,7 +264,7 @@ export function DailyLogForm({ onLogUpdated }: DailyLogFormProps) {
               />
             </div>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Saving..." : "Save Activity Log"}
+              {isLoading ? 'Saving...' : 'Save'}
             </Button>
           </form>
         </Form>
