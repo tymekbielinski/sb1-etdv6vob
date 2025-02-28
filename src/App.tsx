@@ -13,6 +13,7 @@ const Dashboard = lazy(() => import('@/pages/dashboard'));
 const Opportunities = lazy(() => import('@/pages/opportunities'));
 const TeamSettings = lazy(() => import('@/pages/team-settings'));
 const ActivityLog = lazy(() => import('@/pages/activity-log'));
+const NewMetric = lazy(() => import('@/pages/metrics/new'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -48,6 +49,8 @@ function AppRoutes() {
           <Route path="opportunities" element={<Opportunities />} />
           <Route path="team" element={<TeamSettings />} />
           <Route path="activity" element={<ActivityLog />} />
+          <Route path="metrics/new" element={<NewMetric />} />
+          <Route path="metrics/:id" element={<NewMetric />} />
         </Route>
       </Routes>
     </Suspense>

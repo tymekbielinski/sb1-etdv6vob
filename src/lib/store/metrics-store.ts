@@ -10,6 +10,8 @@ export interface MetricDefinition {
   aggregation?: 'sum' | 'average' | 'max' | 'min';
   order: number;
   rowId: string;
+  name?: string;
+  description?: string;
 }
 
 export interface MetricRow {

@@ -9,12 +9,12 @@ import { useTeamStore } from '@/lib/store/team-store';
 import { useDailyLogsStore } from '@/lib/store/daily-logs-store';
 import { useChartsStore } from '@/lib/store/charts-store';
 import { useMetricsStore } from '@/lib/store/metrics-store';
-import { MetricFilterModal } from '@/components/metrics/metric-filter-modal';
 import { MetricRow } from '@/components/metrics/metric-row';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { useToast } from '@/hooks/use-toast';
 import { calculateMetrics } from '@/lib/utils/metrics';
 import type { DateRange } from '@/lib/types';
+import { useNavigate } from 'react-router-dom';
 
 // Define default activities
 const DEFAULT_ACTIVITIES: ActivityType[] = [
@@ -41,6 +41,7 @@ export default function Dashboard() {
   const { charts, addChart } = useChartsStore();
   const { rows, addRow, addMetric } = useMetricsStore();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Initialize team data
   useEffect(() => {
@@ -172,19 +173,14 @@ export default function Dashboard() {
         </div>
 
         {/* Add New Metric Button */}
-        <div className="flex justify-end">
-          <MetricFilterModal onSave={(definition) => {
-            // Add a new row if we don't have any
-            if (rows.length === 0) {
-              addRow();
-            }
-            // The metric will be added to the first row by default
-            const firstRow = rows[0];
-            if (firstRow) {
-              addMetric(firstRow.id, definition);
-            }
-          }} />
-        </div>
+        <Button
+          variant="outline"
+          className="w-full py-8 border-dashed"
+          onClick={() => navigate('/metrics/new')}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Add New Metric
+        </Button>
 
         {/* Custom Metric Rows */}
         <div className="space-y-4">
