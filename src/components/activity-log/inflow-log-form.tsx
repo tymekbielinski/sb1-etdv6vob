@@ -16,7 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useTeamStore } from '@/lib/store/team-store';
-import { createOrUpdateDailyLog, getTodaysLog } from '@/lib/api/daily-logs/mutations';
+import { createOrUpdateDailyLog, getDailyLog } from '@/lib/api/daily-logs/mutations';
+import { format } from 'date-fns';
 
 const formSchema = z.object({
   quotes: z.number().min(0, 'Must be 0 or greater'),
@@ -31,9 +32,10 @@ type FormData = z.infer<typeof formSchema>;
 
 interface InflowLogFormProps {
   onLogUpdated?: () => void;
+  selectedDate?: Date;
 }
 
-export function InflowLogForm({ onLogUpdated }: InflowLogFormProps) {
+export function InflowLogForm({ onLogUpdated, selectedDate = new Date() }: InflowLogFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const { user } = useAuth();
@@ -53,29 +55,40 @@ export function InflowLogForm({ onLogUpdated }: InflowLogFormProps) {
   });
 
   useEffect(() => {
-    async function loadTodaysLog() {
+    async function loadLog() {
       if (!user?.id || !team?.id) return;
 
       try {
-        const log = await getTodaysLog(user.id, team.id);
+        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+        const log = await getDailyLog(user.id, team.id, formattedDate);
         if (log) {
           form.reset({
-            quotes: log.quotes,
-            booked_calls: log.booked_calls,
-            completed_calls: log.completed_calls,
-            booked_presentations: log.booked_presentations,
-            completed_presentations: log.completed_presentations,
-            submitted_applications: log.submitted_applications,
+            quotes: log.quotes || 0,
+            booked_calls: log.booked_calls || 0,
+            completed_calls: log.completed_calls || 0,
+            booked_presentations: log.booked_presentations || 0,
+            completed_presentations: log.completed_presentations || 0,
+            submitted_applications: log.submitted_applications || 0,
           });
           setLastUpdated(new Date(log.created_at).toLocaleTimeString());
+        } else {
+          form.reset({
+            quotes: 0,
+            booked_calls: 0,
+            completed_calls: 0,
+            booked_presentations: 0,
+            completed_presentations: 0,
+            submitted_applications: 0,
+          });
+          setLastUpdated(null);
         }
       } catch (error) {
-        console.error('Error loading today\'s log:', error);
+        console.error('Error loading log:', error);
       }
     }
 
-    loadTodaysLog();
-  }, [user?.id, team?.id, form]);
+    loadLog();
+  }, [user?.id, team?.id, selectedDate, form]);
 
   const onSubmit = async (values: FormData) => {
     if (!user?.id || !team?.id) {
@@ -89,19 +102,20 @@ export function InflowLogForm({ onLogUpdated }: InflowLogFormProps) {
 
     setIsLoading(true);
     try {
-      const currentLog = await getTodaysLog(user.id, team.id);
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      const currentLog = await getDailyLog(user.id, team.id, formattedDate);
       await createOrUpdateDailyLog({
         ...currentLog,
         ...values,
         user_id: user.id,
         team_id: team.id,
-        date: new Date().toISOString().split('T')[0],
+        date: formattedDate,
       });
 
       setLastUpdated(new Date().toLocaleTimeString());
       toast({
         title: 'Success',
-        description: 'Inflow log has been saved',
+        description: `Opportunity log has been saved for ${format(selectedDate, 'PPP')}`,
       });
       
       onLogUpdated?.();
@@ -109,7 +123,7 @@ export function InflowLogForm({ onLogUpdated }: InflowLogFormProps) {
       console.error('Error saving log:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save inflow log',
+        description: 'Failed to save opportunity log',
         variant: 'destructive',
       });
     } finally {
@@ -121,7 +135,7 @@ export function InflowLogForm({ onLogUpdated }: InflowLogFormProps) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Today's Opportunities Log</span>
+          <span>Opportunities Log for {format(selectedDate, 'PPP')}</span>
           {lastUpdated && (
             <span className="text-sm font-normal text-muted-foreground">
               Last updated: {lastUpdated}
@@ -243,7 +257,7 @@ export function InflowLogForm({ onLogUpdated }: InflowLogFormProps) {
               />
             </div>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Saving..." : "Save Inflow Log"}
+              {isLoading ? "Saving..." : "Save Opportunity Log"}
             </Button>
           </form>
         </Form>

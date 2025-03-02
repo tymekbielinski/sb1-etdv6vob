@@ -8,11 +8,13 @@ import { InflowLogForm } from '@/components/activity-log/inflow-log-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { createOrUpdateDailyLog, getTodaysLog } from '@/lib/api/daily-logs/mutations';
+import { createOrUpdateDailyLog, getDailyLog } from '@/lib/api/daily-logs/mutations';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useTeamStore } from '@/lib/store/team-store';
+import { DatePickerDialog } from '@/components/activity-log/date-picker-dialog';
+import { format } from 'date-fns';
 
-function DealEntryModal({ onDealAdded }: { onDealAdded: () => void }) {
+function DealEntryModal({ onDealAdded, selectedDate }: { onDealAdded: () => void; selectedDate: Date }) {
   const [dealValue, setDealValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
@@ -24,11 +26,11 @@ function DealEntryModal({ onDealAdded }: { onDealAdded: () => void }) {
     e.preventDefault();
     if (!user?.id || !team?.id) return;
 
-    const value = parseFloat(dealValue);
+    const value = parseInt(dealValue, 10);
     if (isNaN(value) || value <= 0) {
       toast({
         title: 'Invalid deal value',
-        description: 'Please enter a value greater than 0',
+        description: 'Please enter a whole number greater than 0',
         variant: 'destructive',
       });
       return;
@@ -36,22 +38,22 @@ function DealEntryModal({ onDealAdded }: { onDealAdded: () => void }) {
 
     setIsSubmitting(true);
     try {
-      // Get current log
-      const currentLog = await getTodaysLog(user.id, team.id);
+      // Get current log for the selected date
+      const currentLog = await getDailyLog(user.id, team.id, format(selectedDate, 'yyyy-MM-dd'));
       
-      // Update with new deal
+      // Update with new deal - store as whole number
       await createOrUpdateDailyLog({
         ...currentLog,
-        deals_won: (currentLog.deals_won || 0) + 1,
-        deal_value: (currentLog.deal_value || 0) + Math.round(value * 100), // Convert to cents
+        deals_won: (currentLog?.deals_won || 0) + 1,
+        deal_value: (currentLog?.deal_value || 0) + value, // Store as whole number
         user_id: user.id,
         team_id: team.id,
-        date: new Date().toISOString().split('T')[0],
+        date: format(selectedDate, 'yyyy-MM-dd'),
       });
 
       toast({
         title: 'Success',
-        description: 'Deal has been added successfully',
+        description: `Deal has been added successfully for ${format(selectedDate, 'PPP')}`,
       });
       setOpen(false);
       setDealValue('');
@@ -82,7 +84,7 @@ function DealEntryModal({ onDealAdded }: { onDealAdded: () => void }) {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add New Won Deal</DialogTitle>
+          <DialogTitle>Add New Won Deal for {format(selectedDate, 'PPP')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -94,14 +96,14 @@ function DealEntryModal({ onDealAdded }: { onDealAdded: () => void }) {
               <Input
                 id="dealValue"
                 type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
+                min="1"
+                placeholder="0"
                 value={dealValue}
                 onChange={(e) => setDealValue(e.target.value)}
                 className="pl-9"
               />
             </div>
+            <p className="text-xs text-muted-foreground">Enter whole dollar amount (no cents)</p>
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
@@ -119,6 +121,7 @@ function DealEntryModal({ onDealAdded }: { onDealAdded: () => void }) {
 
 export default function Opportunities() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [metrics, setMetrics] = useState({
     deals_won: 0,
     deal_value: 0,
@@ -137,16 +140,16 @@ export default function Opportunities() {
     if (!user?.id || !team?.id) return;
 
     try {
-      const log = await getTodaysLog(user.id, team.id);
+      const log = await getDailyLog(user.id, team.id, format(selectedDate, 'yyyy-MM-dd'));
       setMetrics({
-        deals_won: log.deals_won || 0,
-        deal_value: log.deal_value || 0,
-        quotes: log.quotes || 0,
-        booked_calls: log.booked_calls || 0,
-        completed_calls: log.completed_calls || 0,
-        booked_presentations: log.booked_presentations || 0,
-        completed_presentations: log.completed_presentations || 0,
-        submitted_applications: log.submitted_applications || 0,
+        deals_won: log?.deals_won || 0,
+        deal_value: log?.deal_value || 0,
+        quotes: log?.quotes || 0,
+        booked_calls: log?.booked_calls || 0,
+        completed_calls: log?.completed_calls || 0,
+        booked_presentations: log?.booked_presentations || 0,
+        completed_presentations: log?.completed_presentations || 0,
+        submitted_applications: log?.submitted_applications || 0,
       });
     } catch (error) {
       console.error('Error loading metrics:', error);
@@ -155,35 +158,40 @@ export default function Opportunities() {
 
   useEffect(() => {
     loadMetrics();
-  }, [user?.id, team?.id, refreshKey]);
+  }, [user?.id, team?.id, refreshKey, selectedDate]);
 
   const handleLogUpdated = () => {
     setRefreshKey(prev => prev + 1);
   };
 
-  const formatCurrency = (cents: number) => {
+  const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(cents / 100);
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value);
   };
 
   const handleMetricUpdate = async (field: keyof typeof metrics, value: string) => {
     if (!user?.id || !team?.id) return;
 
     try {
-      const numValue = parseInt(value, 10);
+      let numValue: number;
+      
+      // Parse all values as integers
+      numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue < 0) {
         throw new Error('Invalid value');
       }
 
-      const currentLog = await getTodaysLog(user.id, team.id);
+      const currentLog = await getDailyLog(user.id, team.id, format(selectedDate, 'yyyy-MM-dd'));
       await createOrUpdateDailyLog({
         ...currentLog,
         [field]: numValue,
         user_id: user.id,
         team_id: team.id,
-        date: new Date().toISOString().split('T')[0],
+        date: format(selectedDate, 'yyyy-MM-dd'),
       });
 
       await loadMetrics();
@@ -200,11 +208,17 @@ export default function Opportunities() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Opportunities</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl font-semibold tracking-tight">Opportunities</h1>
+        <DatePickerDialog 
+          selectedDate={selectedDate} 
+          onDateSelect={setSelectedDate} 
+        />
+      </div>
 
       {/* Row 1: Deals Section */}
       <div className="grid gap-4 md:grid-cols-3">
-        <DealEntryModal onDealAdded={handleLogUpdated} />
+        <DealEntryModal onDealAdded={handleLogUpdated} selectedDate={selectedDate} />
         <EditableMetricCard
           title="Deals Won"
           value={metrics.deals_won.toString()}
@@ -257,7 +271,7 @@ export default function Opportunities() {
       </div>
 
       {/* Row 3: Inflow Log */}
-      <InflowLogForm onLogUpdated={handleLogUpdated} />
+      <InflowLogForm onLogUpdated={handleLogUpdated} selectedDate={selectedDate} />
     </div>
   );
 }

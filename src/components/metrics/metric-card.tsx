@@ -23,6 +23,7 @@ interface MetricCardProps {
   value?: string;
   className?: string;
   metric?: MetricDefinition;
+  icon?: any;
 }
 
 const METRIC_LABELS: Record<string, string> = {
@@ -76,12 +77,14 @@ function formatValue(value: number, type: 'number' | 'dollar' | 'percent'): stri
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
       }).format(value);
     case 'percent':
       return new Intl.NumberFormat('en-US', {
         style: 'percent',
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 1,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
       }).format(value);
     default:
       return new Intl.NumberFormat('en-US').format(value);
@@ -102,7 +105,7 @@ function getMetricTitle(metric: MetricDefinition): string {
   }
 }
 
-export function MetricCard({ title, value, className, metric }: MetricCardProps) {
+export function MetricCard({ title, value, className, metric, icon: Icon }: MetricCardProps) {
   const navigate = useNavigate();
   const { removeMetric } = useMetricsStore();
   const { data } = useDailyLogsStore();
@@ -117,8 +120,9 @@ export function MetricCard({ title, value, className, metric }: MetricCardProps)
   if (!metric) {
     return (
       <Card className={cn('flex flex-col', className)} style={style} ref={ref}>
-        <CardHeader className="flex-1">
+        <CardHeader className="flex-1 flex flex-row items-center justify-between space-y-0 pb-2">
           <div className="font-medium">{title}</div>
+          {Icon && <Icon className="h-4 w-4 text-muted-foreground/70" />}
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{value}</div>

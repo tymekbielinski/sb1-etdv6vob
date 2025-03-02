@@ -41,7 +41,7 @@ export function EditableMetricCard({
   // Update cursor position based on text width
   useEffect(() => {
     if (isEditing && valueRef.current) {
-      const text = type === 'currency' ? editValue : value;
+      const text = editValue;
       const tempSpan = document.createElement('span');
       tempSpan.style.visibility = 'hidden';
       tempSpan.style.position = 'absolute';
@@ -53,11 +53,18 @@ export function EditableMetricCard({
       setCursorPosition(tempSpan.offsetWidth);
       document.body.removeChild(tempSpan);
     }
-  }, [editValue, isEditing, type, value]);
+  }, [editValue, isEditing]);
 
   const handleClick = () => {
     setIsEditing(true);
-    setEditValue(type === 'currency' ? value.replace(/[^0-9.]/g, '') : value);
+    // For currency, strip the formatting
+    if (type === 'currency') {
+      // Extract the numeric value from the formatted currency string
+      const numericValue = value.replace(/[^0-9]/g, '');
+      setEditValue(numericValue);
+    } else {
+      setEditValue(value);
+    }
     // Focus after state update
     setTimeout(() => inputRef.current?.focus(), 0);
   };
@@ -66,15 +73,7 @@ export function EditableMetricCard({
     if (!onChange) return;
     
     try {
-      let newValue = editValue;
-      if (type === 'currency') {
-        // Convert to cents for storage
-        const dollars = parseFloat(editValue);
-        if (!isNaN(dollars)) {
-          newValue = Math.round(dollars * 100).toString();
-        }
-      }
-      await onChange(newValue);
+      await onChange(editValue);
     } catch (error) {
       console.error('Error updating value:', error);
       setEditValue(value); // Reset on error
@@ -113,26 +112,39 @@ export function EditableMetricCard({
           ref={valueRef}
         >
           {isEditing ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onBlur={handleBlur}
-              onKeyDown={handleKeyDown}
-              className="w-full bg-transparent text-2xl font-bold tracking-tight outline-none"
-              style={{ caretColor: 'transparent' }}
-            />
+            <div className="relative">
+              <input
+                ref={inputRef}
+                type="number"
+                min="0"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={handleBlur}
+                
+                className="w-full bg-transparent text-2xl font-bold tracking-tight outline-none"
+                style={{ caretColor: 'transparent' }}
+              />
+              {showCursor && (
+                <div 
+                  className="absolute bg-primary w-0.5"
+                  style={{ 
+                    left: `${cursorPosition}px`,
+                    top: '0',
+                    height: '2rem',
+                    bottom: '0'
+                  }}
+                />
+              )}
+              {type === 'currency' && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Enter whole dollar amount
+                </div>
+              )}
+            </div>
           ) : (
             <div className="text-2xl font-bold tracking-tight">
               {value}
             </div>
-          )}
-          {isEditing && showCursor && (
-            <span 
-              className="absolute top-0 h-full w-0.5 bg-primary animate-pulse"
-              style={{ left: `${cursorPosition}px` }}
-            />
           )}
         </div>
       </CardContent>
