@@ -21,6 +21,7 @@ import { DatePickerWithRange } from '@/components/date-range-picker';
 import type { MetricDefinition } from '@/lib/store/metrics-store';
 import type { DateRange } from '@/lib/types';
 import { calculateMetricValue } from '@/lib/utils/metrics';
+import { formatMetricValue } from '@/lib/utils/format';
 import { useDailyLogsStore } from '@/lib/store/daily-logs-store';
 import { useTeamStore } from '@/lib/store/team-store';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +29,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { MetricSelector } from '@/components/metrics/metric-selector';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
+import { startOfDay, endOfDay } from 'date-fns';
 
 const AVAILABLE_METRICS = [
   { value: 'cold_calls', label: 'Cold Calls' },
@@ -56,13 +58,16 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
   const [metricName, setMetricName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
-  const [displayType, setDisplayType] = useState<'number' | 'dollar' | 'percent'>('number');
+  const [displayType, setDisplayType] = useState<'number' | 'dollar' | 'percent'>(
+    existingMetric?.displayType || (activeTab === 'conversions' ? 'percent' : 'number')
+  );
   const [aggregation, setAggregation] = useState<'sum' | 'average' | 'max' | 'min'>('sum');
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const today = new Date();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(today.getDate() - 7);
-    return { from: sevenDaysAgo, to: today };
+    return { 
+      from: startOfDay(today),
+      to: endOfDay(today)
+    };
   });
   const [metricValue, setMetricValue] = useState<number | null>(null);
 
@@ -108,7 +113,6 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
     if (existingMetric) {
       setActiveTab(existingMetric.type === 'total' ? 'totals' : 'conversions');
       setSelectedMetrics(existingMetric.metrics);
-      setDisplayType(existingMetric.displayType);
       if (existingMetric.aggregation) {
         setAggregation(existingMetric.aggregation);
       }
@@ -120,6 +124,13 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
       }
     }
   }, [existingMetric]);
+
+  // Update display type when tab changes
+  useEffect(() => {
+    if (!existingMetric) {
+      setDisplayType(activeTab === 'conversions' ? 'percent' : 'number');
+    }
+  }, [activeTab, existingMetric]);
 
   const handleSave = async () => {
     if (!metricName) {
@@ -141,14 +152,12 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
     }
 
     onSave({
-      name: metricName,
       type: activeTab === 'totals' ? 'total' : 'conversion',
       metrics: selectedMetrics,
+      displayType,
       aggregation: activeTab === 'totals' ? aggregation : undefined,
-      conversionMetrics: activeTab === 'conversion' ? {
-        from: selectedMetrics[0],
-        to: selectedMetrics[1],
-      } : undefined,
+      name: metricName || undefined,
+      description: description || undefined,
     });
 
     // Navigate to dashboard
@@ -263,24 +272,40 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
                 setDate={setDateRange}
               />
             </div>
-            <div className="flex flex-col items-center justify-center py-12">
-              {(isTeamLoading || isActivityLoading) ? (
-                <LoadingSpinner size="lg" className="text-primary mb-4" />
-              ) : (
-                <>
-                  <div className="text-6xl font-bold mb-4">{metricValue}</div>
-                  <Select value={displayType} onValueChange={(value: any) => setDisplayType(value)}>
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue placeholder="Display format" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="number">Number</SelectItem>
-                      <SelectItem value="percent">Percentage</SelectItem>
-                      <SelectItem value="dollar">Currency</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </>
-              )}
+            <div className="flex flex-col items-center gap-12">
+              {/* Large Metric Display */}
+              <div className="flex items-center justify-center min-h-[120px]">
+                {isActivityLoading ? (
+                  <LoadingSpinner className="w-12 h-12" />
+                ) : metricValue !== null ? (
+                  <span className="text-7xl font-semibold tracking-tight">
+                    {formatMetricValue(metricValue, displayType)}
+                  </span>
+                ) : (
+                  <span className="text-3xl text-muted-foreground">
+                    Select metrics to preview
+                  </span>
+                )}
+              </div>
+
+              {/* Display Type Selector */}
+              <div className="w-full max-w-[200px]">
+                <Select
+                  value={displayType}
+                  onValueChange={(value: 'number' | 'dollar' | 'percent') =>
+                    setDisplayType(value)
+                  }
+                >
+                  <SelectTrigger id="displayType">
+                    <SelectValue placeholder="Select display type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="dollar">Currency ($)</SelectItem>
+                    <SelectItem value="percent">Percentage (%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </Card>
         </div>

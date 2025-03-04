@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { useMetricsStore, type MetricDefinition } from '@/lib/store/metrics-store';
 import { useDailyLogsStore } from '@/lib/store/daily-logs-store';
 import { useResizable } from '@/hooks/use-resizable';
+import { formatMetricValue } from '@/lib/utils/format';
 
 interface MetricCardProps {
   title?: string;
@@ -71,26 +72,6 @@ function calculateMetricValue(metric: MetricDefinition, data: any[]): number {
   return 0;
 }
 
-function formatValue(value: number, type: 'number' | 'dollar' | 'percent'): string {
-  switch (type) {
-    case 'dollar':
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(value);
-    case 'percent':
-      return new Intl.NumberFormat('en-US', {
-        style: 'percent',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(value);
-    default:
-      return new Intl.NumberFormat('en-US').format(value);
-  }
-}
-
 function getMetricTitle(metric: MetricDefinition): string {
   if (metric.name) {
     return metric.name;
@@ -101,15 +82,14 @@ function getMetricTitle(metric: MetricDefinition): string {
     return `Total ${metricNames.join(' + ')}`;
   } else {
     const [numerator, denominator] = metric.metrics;
-    return `${METRIC_LABELS[numerator]} / ${METRIC_LABELS[denominator]} Rate`;
+    return `${METRIC_LABELS[numerator]} / ${METRIC_LABELS[denominator]}`;
   }
 }
 
 export function MetricCard({ title, value, className, metric, icon: Icon }: MetricCardProps) {
-  const navigate = useNavigate();
   const { removeMetric } = useMetricsStore();
-  const { data } = useDailyLogsStore();
-  const { ref, style } = useResizable();
+  const { data: activityData } = useDailyLogsStore();
+  const navigate = useNavigate();
 
   const handleEdit = () => {
     if (metric) {
@@ -117,68 +97,68 @@ export function MetricCard({ title, value, className, metric, icon: Icon }: Metr
     }
   };
 
-  if (!metric) {
-    return (
-      <Card className={cn('flex flex-col', className)} style={style} ref={ref}>
-        <CardHeader className="flex-1 flex flex-row items-center justify-between space-y-0 pb-2">
-          <div className="font-medium">{title}</div>
-          {Icon && <Icon className="h-4 w-4 text-muted-foreground/70" />}
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{value}</div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleDelete = () => {
+    if (metric) {
+      removeMetric(metric.id);
+    }
+  };
 
-  const metricTitle = getMetricTitle(metric);
-  const metricValue = formatValue(calculateMetricValue(metric, data), metric.displayType);
+  const displayValue = metric
+    ? formatMetricValue(calculateMetricValue(metric, activityData), metric.displayType)
+    : value;
+
+  const displayTitle = metric ? getMetricTitle(metric) : title;
 
   return (
-    <Card className={cn('flex flex-col group relative', className)} style={style} ref={ref}>
-      <CardHeader className="flex-1">
-        <div className="font-medium">{metricTitle}</div>
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleEdit}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete metric?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the metric.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => metric && removeMetric(metric.id)}
-                  className="bg-destructive hover:bg-destructive/90"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+    <Card className={cn("relative group", className)}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div className="flex items-center space-x-2">
+          {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+          <h3 className="font-medium leading-none">{displayTitle}</h3>
         </div>
+        {metric && (
+          <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleEdit}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:bg-destructive/20 hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete this metric.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{metricValue}</div>
+        <div className="text-2xl font-bold">{displayValue}</div>
       </CardContent>
     </Card>
   );
