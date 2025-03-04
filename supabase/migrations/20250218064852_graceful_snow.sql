@@ -1,19 +1,7 @@
-/*
-  # Add function for team member activity logs
+-- Drop the existing function if it exists
+DROP FUNCTION IF EXISTS get_team_member_logs(uuid, date, date);
 
-  1. New Functions
-    - `get_team_member_logs`: Retrieves daily logs for team members with proper aggregation
-      - Parameters:
-        - p_team_id: UUID of the team
-        - p_start_date: Start date for the logs
-        - p_end_date: End date for the logs
-      - Returns: JSON array of daily logs with member data
-
-  2. Security
-    - Function is accessible only to authenticated users
-    - Includes RLS checks for team membership
-*/
-
+-- Create or replace the function
 CREATE OR REPLACE FUNCTION get_team_member_logs(
   p_team_id UUID,
   p_start_date DATE,
@@ -108,5 +96,5 @@ BEGIN
   )
   SELECT * FROM aggregated_by_date
   ORDER BY date;
-END;
+END
 $$;
