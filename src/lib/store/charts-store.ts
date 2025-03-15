@@ -15,6 +15,7 @@ interface ChartsState {
   updateChart: (id: string, updates: Partial<ChartConfig>) => void;
   reorderCharts: (fromIndex: number, toIndex: number) => void;
   removeChart: (id: string) => void;
+  setCharts: (charts: ChartConfig[]) => void;
 }
 
 export const useChartsStore = create<ChartsState>()(
@@ -55,14 +56,15 @@ export const useChartsStore = create<ChartsState>()(
           })),
         };
       }),
-      removeChart: (id) => set((state) => ({
-        charts: state.charts
-          .filter((chart) => chart.id !== id)
-          .map((chart, index) => ({
-            ...chart,
-            order: index,
-          })),
-      })),
+      removeChart: (id) => set((state) => {
+        // Don't remove the last chart
+        if (state.charts.length <= 1) return state;
+        
+        return {
+          charts: state.charts.filter((chart) => chart.id !== id),
+        };
+      }),
+      setCharts: (charts) => set({ charts }),
     }),
     {
       name: 'charts-storage',

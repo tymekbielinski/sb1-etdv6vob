@@ -32,6 +32,8 @@ interface MetricsState {
   removeRow: (id: string) => void;
   reorderRows: (fromIndex: number, toIndex: number) => void;
   reorderMetrics: (rowId: string, fromIndex: number, toIndex: number) => void;
+  setDefinitions: (definitions: MetricDefinition[]) => void;
+  setRows: (rows: MetricRow[]) => void;
 }
 
 export const useMetricsStore = create<MetricsState>()(
@@ -50,10 +52,10 @@ export const useMetricsStore = create<MetricsState>()(
         if (!row) return state;
 
         const newMetric: MetricDefinition = {
-          ...definition,
           id: nanoid(),
-          order: row.metrics.length,
           rowId,
+          order: row.metrics.length,
+          ...definition,
         };
 
         return {
@@ -66,20 +68,18 @@ export const useMetricsStore = create<MetricsState>()(
         };
       }),
       updateMetric: (id, updates) => set((state) => ({
-        definitions: state.definitions.map((def) =>
-          def.id === id ? { ...def, ...updates } : def
-        ),
+        definitions: state.definitions.map(d => d.id === id ? { ...d, ...updates } : d),
       })),
       removeMetric: (id) => set((state) => {
-        const definition = state.definitions.find(d => d.id === id);
-        if (!definition) return state;
+        const metric = state.definitions.find(d => d.id === id);
+        if (!metric) return state;
 
         return {
           definitions: state.definitions.filter(d => d.id !== id),
-          rows: state.rows.map(row => 
-            row.id === definition.rowId
-              ? { ...row, metrics: row.metrics.filter(m => m !== id) }
-              : row
+          rows: state.rows.map(r => 
+            r.id === metric.rowId 
+              ? { ...r, metrics: r.metrics.filter(m => m !== id) }
+              : r
           ),
         };
       }),
@@ -94,22 +94,20 @@ export const useMetricsStore = create<MetricsState>()(
         ],
       })),
       updateRow: (id, updates) => set((state) => ({
-        rows: state.rows.map((row) =>
-          row.id === id ? { ...row, ...updates } : row
-        ),
+        rows: state.rows.map(r => r.id === id ? { ...r, ...updates } : r),
       })),
       removeRow: (id) => set((state) => {
-        // Don't allow removing the default row
-        if (id === 'default') return state;
+        // Don't remove the last row
+        if (state.rows.length <= 1) return state;
 
-        // Remove all metrics in the row
-        const metricsToRemove = state.rows.find(r => r.id === id)?.metrics || [];
+        // Remove all metrics in this row
+        const metricsToRemove = state.definitions
+          .filter(d => d.rowId === id)
+          .map(d => d.id);
 
         return {
           definitions: state.definitions.filter(d => !metricsToRemove.includes(d.id)),
-          rows: state.rows
-            .filter(r => r.id !== id)
-            .map((row, index) => ({ ...row, order: index })),
+          rows: state.rows.filter(r => r.id !== id),
         };
       }),
       reorderRows: (fromIndex, toIndex) => set((state) => {
@@ -117,28 +115,35 @@ export const useMetricsStore = create<MetricsState>()(
         const [movedRow] = newRows.splice(fromIndex, 1);
         newRows.splice(toIndex, 0, movedRow);
 
+        // Update order property
         return {
-          rows: newRows.map((row, index) => ({ ...row, order: index })),
+          rows: newRows.map((r, i) => ({ ...r, order: i })),
         };
       }),
       reorderMetrics: (rowId, fromIndex, toIndex) => set((state) => {
         const row = state.rows.find(r => r.id === rowId);
         if (!row) return state;
 
-        const newMetrics = [...row.metrics];
-        const [movedMetric] = newMetrics.splice(fromIndex, 1);
-        newMetrics.splice(toIndex, 0, movedMetric);
+        const newMetricIds = [...row.metrics];
+        const [movedMetricId] = newMetricIds.splice(fromIndex, 1);
+        newMetricIds.splice(toIndex, 0, movedMetricId);
 
+        // Update rows and metric orders
         return {
-          rows: state.rows.map(r =>
-            r.id === rowId ? { ...r, metrics: newMetrics } : r
+          rows: state.rows.map(r => 
+            r.id === rowId 
+              ? { ...r, metrics: newMetricIds }
+              : r
           ),
-          definitions: state.definitions.map((def, index) => ({
-            ...def,
-            order: newMetrics.indexOf(def.id),
-          })),
+          definitions: state.definitions.map(d => {
+            if (d.rowId !== rowId) return d;
+            const newIndex = newMetricIds.indexOf(d.id);
+            return newIndex !== -1 ? { ...d, order: newIndex } : d;
+          }),
         };
       }),
+      setDefinitions: (definitions) => set({ definitions }),
+      setRows: (rows) => set({ rows }),
     }),
     {
       name: 'metrics-storage',

@@ -151,11 +151,23 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
       return;
     }
 
+    if (activeTab === 'conversions' && selectedMetrics.length !== 2) {
+      toast({
+        title: "Error",
+        description: "Please select exactly two metrics for conversion calculation",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const metricType = activeTab === 'totals' ? 'total' : 'conversion';
+    const metricDisplayType = metricType === 'conversion' ? 'percent' : displayType;
+
     onSave({
-      type: activeTab === 'totals' ? 'total' : 'conversion',
+      type: metricType,
       metrics: selectedMetrics,
-      displayType,
-      aggregation: activeTab === 'totals' ? aggregation : undefined,
+      displayType: metricDisplayType,
+      aggregation: metricType === 'total' ? aggregation : undefined,
       name: metricName || undefined,
       description: description || undefined,
     });
