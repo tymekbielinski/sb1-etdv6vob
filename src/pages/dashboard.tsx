@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Phone, MessageSquare, Facebook, Linkedin, Instagram, Mail, BarChart3, Plus, Save, RefreshCw } from 'lucide-react';
+import { Phone, MessageSquare, Facebook, Linkedin, Instagram, Mail, BarChart3, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/metrics/metric-card';
 import { ChartContainer } from '@/components/charts/chart-container';
@@ -219,31 +219,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <DashboardBreadcrumb />
+      <DashboardBreadcrumb 
+        dashboardTitle={currentDashboard?.title}
+        isSaving={isSaving}
+        onSave={handleSaveDashboard}
+      />
       <div className="flex flex-col gap-4">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/dashboards')}>
-              All Dashboards
-            </Button>
-            <Button 
-              onClick={handleSaveDashboard} 
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <>
-                  <LoadingSpinner className="mr-2 h-4 w-4" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </div>
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -256,22 +239,6 @@ export default function Dashboard() {
               selectedActivities={selectedActivities}
               onSelectionChange={setSelectedActivities}
             />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigate('/metrics/new', { state: { dashboardId } })}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => fetchLogs(dateRange.from, dateRange.to)}
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </div>

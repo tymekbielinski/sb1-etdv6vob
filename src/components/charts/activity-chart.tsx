@@ -14,6 +14,7 @@ import { ChartGradient } from './chart-gradient';
 import { axisConfig, tooltipConfig, areaConfig } from '@/lib/config/chart.config';
 import type { ActivityType } from '@/components/dashboard/activity-filter';
 import type { DailyLogData } from '@/lib/api/daily-logs/queries';
+import { useTeamStore } from '@/lib/store/team-store';
 
 interface ActivityChartProps {
   data: DailyLogData[];
@@ -21,36 +22,50 @@ interface ActivityChartProps {
   displayMode: ('total' | 'breakdown' | 'members')[];
 }
 
-const METRIC_LABELS: Record<string, string> = {
-  cold_calls: 'Cold Calls',
-  text_messages: 'Text Messages',
-  facebook_dms: 'Facebook DMs',
-  linkedin_dms: 'LinkedIn DMs',
-  instagram_dms: 'Instagram DMs',
-  cold_emails: 'Cold Emails',
-};
-
 const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+  const { team } = useTeamStore();
+  
   if (!active || !payload) return null;
+
+  // Helper function to get activity label
+  const getActivityLabel = (id: string): string => {
+    const activity = team?.default_activities?.find(a => a.id === id);
+    if (activity) return activity.label;
+    return id.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
 
   return (
     <div className="rounded-lg border bg-card p-2 shadow-sm">
       <p className="mb-1 font-medium">{new Date(label).toLocaleDateString()}</p>
-      {payload.map((entry, index) => (
-        <p key={`${entry.name}-${index}`} className="flex items-center gap-2 text-sm">
-          <span
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: entry.color }}
-          />
-          <span className="text-muted-foreground">{entry.name}:</span>
-          <span className="font-medium">{entry.value}</span>
-        </p>
-      ))}
+      {payload.map((entry, index) => {
+        // Get the proper label based on the entry name
+        let displayName = entry.name;
+        
+        // If it's not "total" or a member name, it's an activity ID
+        if (entry.name !== 'total' && !payload.find(p => p.payload?.member_data?.some(m => m.name === entry.name))) {
+          displayName = getActivityLabel(entry.name);
+        }
+        
+        return (
+          <p key={`${entry.name}-${index}`} className="flex items-center gap-2 text-sm">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-muted-foreground">{displayName}:</span>
+            <span className="font-medium">{entry.value}</span>
+          </p>
+        );
+      })}
     </div>
   );
 };
 
 export function ActivityChart({ data, selectedActivities, displayMode }: ActivityChartProps) {
+  const { team } = useTeamStore();
+  
   // If no activities are selected, return empty state
   if (selectedActivities.length === 0) {
     return (
@@ -98,10 +113,15 @@ export function ActivityChart({ data, selectedActivities, displayMode }: Activit
     }
 
     if (displayMode.includes('breakdown')) {
-      items.push(...selectedActivities.map((metric, index) => ({
-        label: METRIC_LABELS[metric],
-        color: Object.values(CHART_COLORS)[index % Object.values(CHART_COLORS).length]
-      })));
+      items.push(...selectedActivities.map((metric, index) => {
+        const activity = team?.default_activities?.find(a => a.id === metric);
+        return {
+          label: activity?.label || metric.split('_').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' '),
+          color: Object.values(CHART_COLORS)[index % Object.values(CHART_COLORS).length]
+        };
+      }));
     }
 
     if (displayMode.includes('members') && data[0]?.member_data) {

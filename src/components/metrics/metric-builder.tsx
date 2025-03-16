@@ -76,6 +76,19 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Get available metrics with labels from team settings
+  const getAvailableMetrics = () => {
+    if (!team?.default_activities) return AVAILABLE_METRICS;
+
+    return AVAILABLE_METRICS.map(metric => {
+      const teamMetric = team.default_activities.find(a => a.id === metric.value);
+      return {
+        value: metric.value,
+        label: teamMetric?.label || metric.label
+      };
+    });
+  };
+
   // Load activity data when date range changes
   useEffect(() => {
     if (team?.id) {
@@ -176,6 +189,15 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
     navigate('/');
   };
 
+  // Get metric label from team settings or default
+  const getMetricLabel = (metricId: string): string => {
+    const teamMetric = team?.default_activities?.find(a => a.id === metricId);
+    if (teamMetric) return teamMetric.label;
+
+    const defaultMetric = AVAILABLE_METRICS.find(m => m.value === metricId);
+    return defaultMetric?.label || metricId;
+  };
+
   return (
     <div className="min-h-screen bg-background relative">
       {/* Fixed Save Button */}
@@ -221,24 +243,21 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
               {/* Selected Metrics Pool */}
               {selectedMetrics.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {selectedMetrics.map(value => {
-                    const metric = AVAILABLE_METRICS.find(m => m.value === value);
-                    return (
-                      <Badge
-                        key={value}
-                        variant="secondary"
-                        className="group cursor-pointer hover:bg-muted"
+                  {selectedMetrics.map(value => (
+                    <Badge
+                      key={value}
+                      variant="secondary"
+                      className="group cursor-pointer hover:bg-muted"
+                    >
+                      {getMetricLabel(value)}
+                      <button
+                        onClick={() => setSelectedMetrics(metrics => metrics.filter(m => m !== value))}
+                        className="ml-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-background/20 p-0.5"
                       >
-                        {metric?.label}
-                        <button
-                          onClick={() => setSelectedMetrics(metrics => metrics.filter(m => m !== value))}
-                          className="ml-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-background/20 p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    );
-                  })}
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
                 </div>
               )}
 
@@ -246,7 +265,7 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <MetricSelector
-                    metrics={AVAILABLE_METRICS}
+                    metrics={getAvailableMetrics()}
                     selectedMetrics={selectedMetrics}
                     onChange={setSelectedMetrics}
                     className="w-full"

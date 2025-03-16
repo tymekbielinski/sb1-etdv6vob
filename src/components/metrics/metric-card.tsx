@@ -105,7 +105,10 @@ export function MetricCard({ title, value, className, metric, icon: Icon }: Metr
   const displayTitle = metric ? getMetricTitle(metric) : title;
 
   return (
-    <Card className={cn("relative group", className)}>
+    <Card className={cn(
+      "relative group transition-colors hover:bg-accent/50",
+      className
+    )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="flex items-center space-x-2">
           {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
