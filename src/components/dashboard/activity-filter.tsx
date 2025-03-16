@@ -6,6 +6,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useTeamStore } from '@/lib/store/team-store';
+import { TeamActivity } from '@/lib/types/team';
 
 export type ActivityType = 
   | 'cold_calls'
@@ -20,34 +22,29 @@ interface ActivityFilterProps {
   onSelectionChange: (activities: ActivityType[]) => void;
 }
 
-const ACTIVITY_LABELS: Record<ActivityType | 'all', string> = {
-  all: 'All Activities',
-  cold_calls: 'Cold Calls',
-  text_messages: 'Text Messages',
-  facebook_dms: 'Facebook DMs',
-  linkedin_dms: 'LinkedIn DMs',
-  instagram_dms: 'Instagram DMs',
-  cold_emails: 'Cold Emails',
-};
-
-const ACTIVITIES: ActivityType[] = [
-  'cold_calls',
-  'text_messages',
-  'facebook_dms',
-  'linkedin_dms',
-  'instagram_dms',
-  'cold_emails',
+const DEFAULT_ACTIVITIES: TeamActivity[] = [
+  { id: 'cold_calls', label: 'Cold Calls' },
+  { id: 'text_messages', label: 'Text Messages' },
+  { id: 'facebook_dms', label: 'Facebook DMs' },
+  { id: 'linkedin_dms', label: 'LinkedIn DMs' },
+  { id: 'instagram_dms', label: 'Instagram DMs' },
+  { id: 'cold_emails', label: 'Cold Emails' }
 ];
 
 export function ActivityFilter({ selectedActivities, onSelectionChange }: ActivityFilterProps) {
+  const { team } = useTeamStore();
+  const activities = (team?.default_activities ?? DEFAULT_ACTIVITIES).filter(activity => 
+    DEFAULT_ACTIVITIES.some(defaultActivity => defaultActivity.id === activity.id)
+  );
+
   const handleActivityToggle = (activity: ActivityType | 'all') => {
     if (activity === 'all') {
       // Toggle between all activities and none
-      const allActivitiesSelected = ACTIVITIES.every(a => 
-        selectedActivities.includes(a)
+      const allActivitiesSelected = activities.every(a => 
+        selectedActivities.includes(a.id)
       );
       
-      onSelectionChange(allActivitiesSelected ? [] : [...ACTIVITIES]);
+      onSelectionChange(allActivitiesSelected ? [] : activities.map(a => a.id));
     } else {
       // Toggle individual activity
       const newSelection = selectedActivities.includes(activity)
@@ -59,9 +56,15 @@ export function ActivityFilter({ selectedActivities, onSelectionChange }: Activi
   };
 
   // Calculate if all activities are selected
-  const allActivitiesSelected = ACTIVITIES.every(activity => 
-    selectedActivities.includes(activity)
+  const allActivitiesSelected = activities.every(activity => 
+    selectedActivities.includes(activity.id)
   );
+
+  const getActivityLabel = (activity: ActivityType | 'all'): string => {
+    if (activity === 'all') return 'All Activities';
+    const activityItem = activities.find(a => a.id === activity);
+    return activityItem?.label ?? activity;
+  };
 
   return (
     <DropdownMenu>
@@ -69,7 +72,7 @@ export function ActivityFilter({ selectedActivities, onSelectionChange }: Activi
         <Button variant="outline" className="w-[200px] justify-start">
           {selectedActivities.length === 0
             ? 'Select Activities'
-            : selectedActivities.length === ACTIVITIES.length
+            : selectedActivities.length === activities.length
             ? 'All Activities'
             : `${selectedActivities.length} Selected`}
         </Button>
@@ -86,15 +89,15 @@ export function ActivityFilter({ selectedActivities, onSelectionChange }: Activi
           checked={allActivitiesSelected}
           onCheckedChange={() => handleActivityToggle('all')}
         >
-          {ACTIVITY_LABELS.all}
+          All Activities
         </DropdownMenuCheckboxItem>
-        {ACTIVITIES.map(activity => (
+        {activities.map((activity) => (
           <DropdownMenuCheckboxItem
-            key={activity}
-            checked={selectedActivities.includes(activity)}
-            onCheckedChange={() => handleActivityToggle(activity)}
+            key={activity.id}
+            checked={selectedActivities.includes(activity.id)}
+            onCheckedChange={() => handleActivityToggle(activity.id)}
           >
-            {ACTIVITY_LABELS[activity]}
+            {activity.label}
           </DropdownMenuCheckboxItem>
         ))}
       </DropdownMenuContent>

@@ -19,16 +19,32 @@ import { useTeamStore } from '@/lib/store/team-store';
 import { createOrUpdateDailyLog, getDailyLog } from '@/lib/api/daily-logs/mutations';
 import { format } from 'date-fns';
 
-const formSchema = z.object({
-  coldCalls: z.number().min(0, 'Must be 0 or greater'),
-  textMessages: z.number().min(0, 'Must be 0 or greater'),
-  facebookDms: z.number().min(0, 'Must be 0 or greater'),
-  linkedinDms: z.number().min(0, 'Must be 0 or greater'),
-  instagramDms: z.number().min(0, 'Must be 0 or greater'),
-  coldEmails: z.number().min(0, 'Must be 0 or greater'),
-});
+// Create dynamic form schema based on default activities
+const DEFAULT_ACTIVITIES = [
+  'cold_calls',
+  'text_messages',
+  'facebook_dms',
+  'linkedin_dms',
+  'instagram_dms',
+  'cold_emails',
+] as const;
+
+const formSchema = z.object(
+  DEFAULT_ACTIVITIES.reduce((acc, key) => ({
+    ...acc,
+    [key]: z.number().min(0, 'Must be 0 or greater'),
+  }), {})
+);
 
 type FormData = z.infer<typeof formSchema>;
+
+// Helper to convert snake_case to camelCase
+const snakeToCamel = (str: string) => 
+  str.toLowerCase().replace(/(_\w)/g, k => k[1].toUpperCase());
+
+// Helper to convert camelCase to snake_case
+const camelToSnake = (str: string) => 
+  str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
 interface DailyLogFormProps {
   onLogUpdated?: () => void;
@@ -44,14 +60,10 @@ export function DailyLogForm({ onLogUpdated, selectedDate }: DailyLogFormProps) 
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      coldCalls: 0,
-      textMessages: 0,
-      facebookDms: 0,
-      linkedinDms: 0,
-      instagramDms: 0,
-      coldEmails: 0,
-    },
+    defaultValues: DEFAULT_ACTIVITIES.reduce((acc, key) => ({
+      ...acc,
+      [key]: 0,
+    }), {} as FormData),
   });
 
   useEffect(() => {
@@ -61,24 +73,18 @@ export function DailyLogForm({ onLogUpdated, selectedDate }: DailyLogFormProps) 
       try {
         const log = await getDailyLog(user.id, team.id, format(selectedDate, 'yyyy-MM-dd'));
         if (log) {
-          form.reset({
-            coldCalls: log.cold_calls,
-            textMessages: log.text_messages,
-            facebookDms: log.facebook_dms,
-            linkedinDms: log.linkedin_dms,
-            instagramDms: log.instagram_dms,
-            coldEmails: log.cold_emails,
-          });
+          const values = DEFAULT_ACTIVITIES.reduce((acc, key) => ({
+            ...acc,
+            [key]: log[key as keyof typeof log] || 0,
+          }), {} as FormData);
+          form.reset(values);
           setLastUpdated(new Date(log.created_at).toLocaleTimeString());
         } else {
-          form.reset({
-            coldCalls: 0,
-            textMessages: 0,
-            facebookDms: 0,
-            linkedinDms: 0,
-            instagramDms: 0,
-            coldEmails: 0,
-          });
+          const defaultValues = DEFAULT_ACTIVITIES.reduce((acc, key) => ({
+            ...acc,
+            [key]: 0,
+          }), {} as FormData);
+          form.reset(defaultValues);
           setLastUpdated(null);
         }
       } catch (error) {
@@ -101,17 +107,16 @@ export function DailyLogForm({ onLogUpdated, selectedDate }: DailyLogFormProps) 
 
     setIsLoading(true);
     try {
-      await createOrUpdateDailyLog({
-        cold_calls: values.coldCalls,
-        text_messages: values.textMessages,
-        facebook_dms: values.facebookDms,
-        linkedin_dms: values.linkedinDms,
-        instagram_dms: values.instagramDms,
-        cold_emails: values.coldEmails,
+      const logData = DEFAULT_ACTIVITIES.reduce((acc, key) => ({
+        ...acc,
+        [key]: values[key],
+      }), {
         user_id: user.id,
         team_id: team.id,
         date: format(selectedDate, 'yyyy-MM-dd'),
       });
+
+      await createOrUpdateDailyLog(logData);
 
       setLastUpdated(new Date().toLocaleTimeString());
       toast({
@@ -148,120 +153,37 @@ export function DailyLogForm({ onLogUpdated, selectedDate }: DailyLogFormProps) 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <FormField
-                control={form.control}
-                name="coldCalls"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cold Calls</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(e.target.valueAsNumber || 0)
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="textMessages"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Text Messages</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(e.target.valueAsNumber || 0)
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="facebookDms"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Facebook DMs</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(e.target.valueAsNumber || 0)
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="linkedinDms"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>LinkedIn DMs</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(e.target.valueAsNumber || 0)
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="instagramDms"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Instagram DMs</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(e.target.valueAsNumber || 0)
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="coldEmails"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cold Emails</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(e.target.valueAsNumber || 0)
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {DEFAULT_ACTIVITIES.map((activityId) => {
+                const activity = team?.default_activities?.find(a => a.id === activityId) || {
+                  id: activityId,
+                  label: activityId.split('_').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1)
+                  ).join(' ')
+                };
+
+                return (
+                  <FormField
+                    key={activityId}
+                    control={form.control}
+                    name={activityId}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{activity.label}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(e.target.valueAsNumber || 0)
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                );
+              })}
             </div>
             <Button type="submit" disabled={isLoading}>
               {isLoading ? 'Saving...' : 'Save'}

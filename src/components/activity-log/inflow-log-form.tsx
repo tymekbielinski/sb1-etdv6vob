@@ -19,14 +19,21 @@ import { useTeamStore } from '@/lib/store/team-store';
 import { createOrUpdateDailyLog, getDailyLog } from '@/lib/api/daily-logs/mutations';
 import { format } from 'date-fns';
 
-const formSchema = z.object({
-  quotes: z.number().min(0, 'Must be 0 or greater'),
-  booked_calls: z.number().min(0, 'Must be 0 or greater'),
-  completed_calls: z.number().min(0, 'Must be 0 or greater'),
-  booked_presentations: z.number().min(0, 'Must be 0 or greater'),
-  completed_presentations: z.number().min(0, 'Must be 0 or greater'),
-  submitted_applications: z.number().min(0, 'Must be 0 or greater'),
-});
+const FUNNEL_METRICS = [
+  'quotes',
+  'booked_calls',
+  'completed_calls',
+  'booked_presentations',
+  'completed_presentations',
+  'submitted_applications',
+] as const;
+
+const formSchema = z.object(
+  FUNNEL_METRICS.reduce((acc, key) => ({
+    ...acc,
+    [key]: z.number().min(0, 'Must be 0 or greater'),
+  }), {})
+);
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -44,14 +51,10 @@ export function InflowLogForm({ onLogUpdated, selectedDate = new Date() }: Inflo
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      quotes: 0,
-      booked_calls: 0,
-      completed_calls: 0,
-      booked_presentations: 0,
-      completed_presentations: 0,
-      submitted_applications: 0,
-    },
+    defaultValues: FUNNEL_METRICS.reduce((acc, key) => ({
+      ...acc,
+      [key]: 0,
+    }), {} as FormData),
   });
 
   useEffect(() => {
@@ -62,24 +65,18 @@ export function InflowLogForm({ onLogUpdated, selectedDate = new Date() }: Inflo
         const formattedDate = format(selectedDate, 'yyyy-MM-dd');
         const log = await getDailyLog(user.id, team.id, formattedDate);
         if (log) {
-          form.reset({
-            quotes: log.quotes || 0,
-            booked_calls: log.booked_calls || 0,
-            completed_calls: log.completed_calls || 0,
-            booked_presentations: log.booked_presentations || 0,
-            completed_presentations: log.completed_presentations || 0,
-            submitted_applications: log.submitted_applications || 0,
-          });
+          const values = FUNNEL_METRICS.reduce((acc, key) => ({
+            ...acc,
+            [key]: log[key] || 0,
+          }), {} as FormData);
+          form.reset(values);
           setLastUpdated(new Date(log.created_at).toLocaleTimeString());
         } else {
-          form.reset({
-            quotes: 0,
-            booked_calls: 0,
-            completed_calls: 0,
-            booked_presentations: 0,
-            completed_presentations: 0,
-            submitted_applications: 0,
-          });
+          const defaultValues = FUNNEL_METRICS.reduce((acc, key) => ({
+            ...acc,
+            [key]: 0,
+          }), {} as FormData);
+          form.reset(defaultValues);
           setLastUpdated(null);
         }
       } catch (error) {
@@ -147,114 +144,36 @@ export function InflowLogForm({ onLogUpdated, selectedDate = new Date() }: Inflo
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <FormField
-                control={form.control}
-                name="quotes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quotes</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="0"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="booked_calls"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Booked Calls</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="0"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="completed_calls"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Completed Calls</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="0"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="booked_presentations"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Booked Presentations</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="0"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="completed_presentations"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Completed Presentations</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="0"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="submitted_applications"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Submitted Applications</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="0"
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {FUNNEL_METRICS.map((metricId) => {
+                const metric = team?.default_activities?.find(a => a.id === metricId) || {
+                  id: metricId,
+                  label: metricId.split('_').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1)
+                  ).join(' ')
+                };
+
+                return (
+                  <FormField
+                    key={metricId}
+                    control={form.control}
+                    name={metricId}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{metric.label}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            {...field}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                );
+              })}
             </div>
             <Button type="submit" disabled={isLoading}>
               {isLoading ? "Saving..." : "Save Opportunity Log"}

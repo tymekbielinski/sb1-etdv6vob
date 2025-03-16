@@ -122,15 +122,22 @@ function DealEntryModal({ onDealAdded, selectedDate }: { onDealAdded: () => void
 export default function Opportunities() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const FUNNEL_METRICS = [
+    { id: 'quotes', icon: FileText },
+    { id: 'booked_calls', icon: Calendar },
+    { id: 'completed_calls', icon: Phone },
+    { id: 'booked_presentations', icon: Target },
+    { id: 'completed_presentations', icon: Target },
+    { id: 'submitted_applications', icon: ClipboardList },
+  ] as const;
+
   const [metrics, setMetrics] = useState({
     deals_won: 0,
     deal_value: 0,
-    quotes: 0,
-    booked_calls: 0,
-    completed_calls: 0,
-    booked_presentations: 0,
-    completed_presentations: 0,
-    submitted_applications: 0,
+    ...FUNNEL_METRICS.reduce((acc, { id }) => ({
+      ...acc,
+      [id]: 0,
+    }), {}),
   });
   const { user } = useAuth();
   const { team } = useTeamStore();
@@ -141,16 +148,15 @@ export default function Opportunities() {
 
     try {
       const log = await getDailyLog(user.id, team.id, format(selectedDate, 'yyyy-MM-dd'));
-      setMetrics({
+      const values = {
         deals_won: log?.deals_won || 0,
         deal_value: log?.deal_value || 0,
-        quotes: log?.quotes || 0,
-        booked_calls: log?.booked_calls || 0,
-        completed_calls: log?.completed_calls || 0,
-        booked_presentations: log?.booked_presentations || 0,
-        completed_presentations: log?.completed_presentations || 0,
-        submitted_applications: log?.submitted_applications || 0,
-      });
+        ...FUNNEL_METRICS.reduce((acc, { id }) => ({
+          ...acc,
+          [id]: log?.[id] || 0,
+        }), {}),
+      };
+      setMetrics(values);
     } catch (error) {
       console.error('Error loading metrics:', error);
     }
@@ -238,36 +244,23 @@ export default function Opportunities() {
 
       {/* Row 2: Opportunity Metrics */}
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-        <MetricCard
-          title="Quotes"
-          value={metrics.quotes.toString()}
-          icon={FileText}
-        />
-        <MetricCard
-          title="Booked Calls"
-          value={metrics.booked_calls.toString()}
-          icon={Phone}
-        />
-        <MetricCard
-          title="Completed Calls"
-          value={metrics.completed_calls.toString()}
-          icon={Phone}
-        />
-        <MetricCard
-          title="Booked Presentations"
-          value={metrics.booked_presentations.toString()}
-          icon={Calendar}
-        />
-        <MetricCard
-          title="Completed Presentations"
-          value={metrics.completed_presentations.toString()}
-          icon={Calendar}
-        />
-        <MetricCard
-          title="Applications Submitted"
-          value={metrics.submitted_applications.toString()}
-          icon={ClipboardList}
-        />
+        {FUNNEL_METRICS.map(({ id, icon }) => {
+          const metric = team?.default_activities?.find(a => a.id === id) || {
+            id,
+            label: id.split('_').map(word => 
+              word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ')
+          };
+
+          return (
+            <MetricCard
+              key={id}
+              title={metric.label}
+              value={metrics[id]?.toString() || '0'}
+              icon={icon}
+            />
+          );
+        })}
       </div>
 
       {/* Row 3: Inflow Log */}

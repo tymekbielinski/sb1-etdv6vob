@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useMetricsStore, type MetricDefinition } from '@/lib/store/metrics-store';
 import { useDailyLogsStore } from '@/lib/store/daily-logs-store';
+import { useTeamStore } from '@/lib/store/team-store';
 import { useResizable } from '@/hooks/use-resizable';
 import { formatMetricValue } from '@/lib/utils/format';
 
@@ -27,22 +28,16 @@ interface MetricCardProps {
   icon?: any;
 }
 
-const METRIC_LABELS: Record<string, string> = {
-  cold_calls: 'Cold Calls',
-  text_messages: 'Text Messages',
-  facebook_dms: 'Facebook DMs',
-  linkedin_dms: 'LinkedIn DMs',
-  instagram_dms: 'Instagram DMs',
-  cold_emails: 'Cold Emails',
-  quotes: 'Quotes',
-  booked_calls: 'Booked Calls',
-  completed_calls: 'Completed Calls',
-  booked_presentations: 'Booked Presentations',
-  completed_presentations: 'Completed Presentations',
-  submitted_applications: 'Submitted Applications',
-  deals_won: 'Deals Won',
-  deal_value: 'Deal Value',
-};
+function getMetricLabel(id: string): string {
+  const { team } = useTeamStore();
+  const activity = team?.default_activities?.find(a => a.id === id);
+  if (activity) return activity.label;
+
+  // Fallback to formatted ID if no custom label found
+  return id.split('_').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ');
+}
 
 function calculateMetricValue(metric: MetricDefinition, data: any[]): number {
   if (metric.type === 'total') {
@@ -78,11 +73,11 @@ function getMetricTitle(metric: MetricDefinition): string {
   }
   
   if (metric.type === 'total') {
-    const metricNames = metric.metrics.map(m => METRIC_LABELS[m]);
+    const metricNames = metric.metrics.map(m => getMetricLabel(m));
     return `Total ${metricNames.join(' + ')}`;
   } else {
     const [numerator, denominator] = metric.metrics;
-    return `${METRIC_LABELS[numerator]} / ${METRIC_LABELS[denominator]}`;
+    return `${getMetricLabel(numerator)} / ${getMetricLabel(denominator)}`;
   }
 }
 

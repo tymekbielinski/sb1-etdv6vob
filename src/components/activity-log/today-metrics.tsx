@@ -11,14 +11,21 @@ interface TodayMetricsProps {
 }
 
 export function TodayMetrics({ selectedDate }: TodayMetricsProps) {
-  const [metrics, setMetrics] = useState({
-    coldCalls: 0,
-    textMessages: 0,
-    facebookDms: 0,
-    linkedinDms: 0,
-    instagramDms: 0,
-    coldEmails: 0,
-  });
+  const DEFAULT_ACTIVITIES = [
+    { id: 'cold_calls', icon: Phone },
+    { id: 'text_messages', icon: MessageSquare },
+    { id: 'facebook_dms', icon: Facebook },
+    { id: 'linkedin_dms', icon: Linkedin },
+    { id: 'instagram_dms', icon: Instagram },
+    { id: 'cold_emails', icon: Mail },
+  ] as const;
+
+  const [metrics, setMetrics] = useState(
+    DEFAULT_ACTIVITIES.reduce((acc, { id }) => ({
+      ...acc,
+      [id]: 0,
+    }), {} as Record<string, number>)
+  );
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { team } = useTeamStore();
@@ -31,23 +38,19 @@ export function TodayMetrics({ selectedDate }: TodayMetricsProps) {
         setIsLoading(true);
         const log = await getDailyLog(user.id, team.id, format(selectedDate, 'yyyy-MM-dd'));
         if (log) {
-          setMetrics({
-            coldCalls: log.cold_calls,
-            textMessages: log.text_messages,
-            facebookDms: log.facebook_dms,
-            linkedinDms: log.linkedin_dms,
-            instagramDms: log.instagram_dms,
-            coldEmails: log.cold_emails,
-          });
+          setMetrics(
+            DEFAULT_ACTIVITIES.reduce((acc, { id }) => ({
+              ...acc,
+              [id]: log[id] || 0,
+            }), {} as Record<string, number>)
+          );
         } else {
-          setMetrics({
-            coldCalls: 0,
-            textMessages: 0,
-            facebookDms: 0,
-            linkedinDms: 0,
-            instagramDms: 0,
-            coldEmails: 0,
-          });
+          setMetrics(
+            DEFAULT_ACTIVITIES.reduce((acc, { id }) => ({
+              ...acc,
+              [id]: 0,
+            }), {} as Record<string, number>)
+          );
         }
       } catch (error) {
         console.error('Error loading metrics:', error);
@@ -69,36 +72,23 @@ export function TodayMetrics({ selectedDate }: TodayMetricsProps) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <MetricCard
-        title="Cold Calls"
-        value={metrics.coldCalls.toString()}
-        icon={Phone}
-      />
-      <MetricCard
-        title="Text Messages"
-        value={metrics.textMessages.toString()}
-        icon={MessageSquare}
-      />
-      <MetricCard
-        title="Facebook DMs"
-        value={metrics.facebookDms.toString()}
-        icon={Facebook}
-      />
-      <MetricCard
-        title="LinkedIn DMs"
-        value={metrics.linkedinDms.toString()}
-        icon={Linkedin}
-      />
-      <MetricCard
-        title="Instagram DMs"
-        value={metrics.instagramDms.toString()}
-        icon={Instagram}
-      />
-      <MetricCard
-        title="Cold Emails"
-        value={metrics.coldEmails.toString()}
-        icon={Mail}
-      />
+      {DEFAULT_ACTIVITIES.map(({ id, icon }) => {
+        const activity = team?.default_activities?.find(a => a.id === id) || {
+          id,
+          label: id.split('_').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' ')
+        };
+
+        return (
+          <MetricCard
+            key={id}
+            title={activity.label}
+            value={metrics[id]?.toString() || '0'}
+            icon={icon}
+          />
+        );
+      })}
     </div>
   );
 }

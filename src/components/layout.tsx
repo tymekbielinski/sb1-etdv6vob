@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { UserMenu } from '@/components/user-menu';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/lib/store/ui-store';
+import { Toaster } from '@/components/ui/toaster';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: BarChart3 },
@@ -162,6 +163,7 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+      <Toaster />
     </div>
   );
 }

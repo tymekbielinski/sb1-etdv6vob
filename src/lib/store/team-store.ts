@@ -20,6 +20,7 @@ interface TeamState {
 interface TeamActions {
   setTeam: (team: Team | null) => void;
   updateTeamName: (name: string) => Promise<void>;
+  updateTeamActivities: (activities: TeamActivity[]) => Promise<void>;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   initialize: () => Promise<void>;
@@ -115,6 +116,37 @@ export const useTeamStore = create<TeamStore>()(
           set({ team: data });
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Failed to update team name';
+          set({ error: message });
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      updateTeamActivities: async (activities) => {
+        const { team } = get();
+        if (!team) {
+          const error = new Error('No team found');
+          set({ error: error.message });
+          throw error;
+        }
+        
+        try {
+          set({ isLoading: true, error: null });
+          const { data, error } = await supabase
+            .from('teams')
+            .update({ default_activities: activities })
+            .eq('id', team.id)
+            .select('*')
+            .single();
+
+          if (error) throw error;
+          if (!data) throw new Error('Failed to update team activities');
+          
+          // Update the entire team object with the response from the database
+          set({ team: data });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Failed to update team activities';
           set({ error: message });
           throw error;
         } finally {

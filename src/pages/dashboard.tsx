@@ -284,36 +284,41 @@ export default function Dashboard() {
             value={metrics.totalActivities.toString()}
             icon={BarChart3}
           />
-          <MetricCard
-            title="Cold Calls"
-            value={metrics.totalColdCalls.toString()}
-            icon={Phone}
-          />
-          <MetricCard
-            title="Text Messages"
-            value={metrics.totalTextMessages.toString()}
-            icon={MessageSquare}
-          />
-          <MetricCard
-            title="Facebook DMs"
-            value={metrics.totalFacebookDms.toString()}
-            icon={Facebook}
-          />
-          <MetricCard
-            title="LinkedIn DMs"
-            value={metrics.totalLinkedinDms.toString()}
-            icon={Linkedin}
-          />
-          <MetricCard
-            title="Instagram DMs"
-            value={metrics.totalInstagramDms.toString()}
-            icon={Instagram}
-          />
-          <MetricCard
-            title="Cold Emails"
-            value={metrics.totalColdEmails.toString()}
-            icon={Mail}
-          />
+          {DEFAULT_ACTIVITIES.map(activityId => {
+            const activity = team?.default_activities?.find(a => a.id === activityId) || {
+              id: activityId,
+              label: activityId.split('_').map(word => 
+                word.charAt(0).toUpperCase() + word.slice(1)
+              ).join(' ')
+            };
+
+            const icon = {
+              cold_calls: Phone,
+              text_messages: MessageSquare,
+              facebook_dms: Facebook,
+              linkedin_dms: Linkedin,
+              instagram_dms: Instagram,
+              cold_emails: Mail
+            }[activityId];
+
+            const value = {
+              cold_calls: metrics.totalColdCalls,
+              text_messages: metrics.totalTextMessages,
+              facebook_dms: metrics.totalFacebookDms,
+              linkedin_dms: metrics.totalLinkedinDms,
+              instagram_dms: metrics.totalInstagramDms,
+              cold_emails: metrics.totalColdEmails
+            }[activityId];
+
+            return (
+              <MetricCard
+                key={activityId}
+                title={activity.label}
+                value={value.toString()}
+                icon={icon}
+              />
+            );
+          })}
         </div>
 
         {/* Add New Metric Button */}

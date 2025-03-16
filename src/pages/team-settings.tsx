@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { TeamHeader } from '@/components/team/team-header';
 import { TeamRoster } from '@/components/team/team-roster';
+import { TeamBanner } from '@/components/team/team-banner';
+import { DefaultMetrics } from '@/components/team/default-metrics';
 import { useTeamStore } from '@/lib/store/team-store';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import type { TeamMember } from '@/lib/types/team';
@@ -119,8 +121,13 @@ export default function TeamSettings() {
 
   return (
     <div className="space-y-6">
+      <TeamBanner />
       <TeamHeader teamName={team.name} onUpdateName={handleUpdateTeamName} />
       <TeamRoster members={members} />
+      <div className="space-y-4">
+        <h2 className="text-2xl font-semibold tracking-tight">Edit Your Default Metrics</h2>
+        <DefaultMetrics />
+      </div>
     </div>
   );
 }
