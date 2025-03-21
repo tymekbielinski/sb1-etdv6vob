@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet } from 'react-router-dom';
-import { BarChart3, Users, ClipboardList, Menu, PanelLeftClose, ChevronRight, Sparkles } from 'lucide-react';
+import { BarChart3, Users, FilePlus, Menu, PanelLeftClose, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { UserMenu } from '@/components/user-menu';
@@ -9,9 +9,8 @@ import { Toaster } from '@/components/ui/toaster';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: BarChart3 },
-  { name: 'Opportunities', href: '/opportunities', icon: Sparkles },
   { name: 'Team Settings', href: '/team', icon: Users },
-  { name: 'Activity Log', href: '/activity', icon: ClipboardList },
+  { name: 'Activity Log', href: '/activity', icon: FilePlus },
 ];
 
 export default function Layout() {

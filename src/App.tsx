@@ -11,7 +11,6 @@ import { LoadingScreen } from '@/components/loading-screen';
 const Layout = lazy(() => import('@/components/layout'));
 const Dashboard = lazy(() => import('@/pages/dashboard'));
 const Dashboards = lazy(() => import('@/pages/dashboards'));
-const Opportunities = lazy(() => import('@/pages/opportunities'));
 const TeamSettings = lazy(() => import('@/pages/team-settings'));
 const ActivityLog = lazy(() => import('@/pages/activity-log'));
 const NewMetric = lazy(() => import('@/pages/metrics/new'));
@@ -54,7 +53,6 @@ function AppRoutes() {
           <Route index element={<Dashboard />} />
           <Route path="dashboard/:id" element={<Dashboard />} />
           <Route path="dashboards" element={<Dashboards />} />
-          <Route path="opportunities" element={<Opportunities />} />
           <Route path="team" element={<TeamSettings />} />
           <Route path="activity" element={<ActivityLog />} />
           <Route path="metrics/new" element={<NewMetric />} />
