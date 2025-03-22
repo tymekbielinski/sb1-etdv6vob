@@ -53,6 +53,18 @@ export function FilterControls({
     }
   };
 
+  // Check if there are pending changes to apply
+  const hasPendingChanges = () => {
+    if (!pendingDateRange || !dateRange) return !!pendingDateRange;
+    
+    return (
+      pendingDateRange.from?.getTime() !== dateRange.from?.getTime() ||
+      pendingDateRange.to?.getTime() !== dateRange.to?.getTime()
+    );
+  };
+  
+  const isPending = hasPendingChanges();
+  
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
       <DatePickerWithRange 
@@ -62,9 +74,10 @@ export function FilterControls({
       <Button 
         onClick={handleApplyFilters}
         disabled={isLoading}
-        className="w-full sm:w-auto"
+        variant={isPending ? "default" : "outline"}
+        className={`w-full sm:w-auto h-10 ${isPending ? "animate-pulse" : ""}`}
       >
-        {isLoading ? "Applying..." : "Apply Filters"}
+        {isLoading ? "Applying..." : isPending ? "Apply Filters" : "Filters Applied"}
       </Button>
     </div>
   );

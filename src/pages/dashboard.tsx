@@ -32,12 +32,12 @@ export default function Dashboard() {
   const { id: dashboardId } = useParams<{ id: string }>();
   const [isSaving, setIsSaving] = useState(false);
   
-  // Initialize with last 30 days
+  // Initialize with this month as default
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const today = new Date();
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    return { from: thirtyDaysAgo, to: today };
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    return { from: firstDayOfMonth, to: lastDayOfMonth };
   });
   
   const [selectedActivities, setSelectedActivities] = useState<ActivityType[]>(DEFAULT_ACTIVITIES);
