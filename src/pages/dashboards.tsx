@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -20,7 +20,7 @@ export default function DashboardsPage() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [selectedDashboard, setSelectedDashboard] = useState<Dashboard | null>(null);
   
-  const { dashboards, isLoading, error, fetchDashboards, deleteDashboard, updateDashboard } = useDashboardsStore();
+  const { dashboards, isLoading, error, fetchDashboards, deleteDashboard, updateDashboard, setAsHomeDashboard } = useDashboardsStore();
   const { team } = useTeamStore();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -82,6 +82,23 @@ export default function DashboardsPage() {
       toast({
         title: 'Error',
         description: 'Failed to rename dashboard',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const handleSetAsHomeDashboard = async (id: string) => {
+    try {
+      await setAsHomeDashboard(id);
+      toast({
+        title: 'Success',
+        description: 'Home dashboard set successfully',
+      });
+    } catch (error) {
+      console.error('Error setting home dashboard:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to set home dashboard',
         variant: 'destructive',
       });
     }
@@ -154,6 +171,12 @@ export default function DashboardsPage() {
                 >
                   <td className="p-3 flex items-center gap-2">
                     <span className="font-medium">{dashboard.title}</span>
+                    {dashboard.is_home && (
+                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                        <Home className="mr-1 h-3 w-3" />
+                        Home
+                      </span>
+                    )}
                   </td>
                   <td className="p-3 text-muted-foreground">
                     {formatDistanceToNow(new Date(dashboard.created_at), { addSuffix: true })}
@@ -179,6 +202,15 @@ export default function DashboardsPage() {
                         }}>
                           Rename
                         </DropdownMenuItem>
+                        {!dashboard.is_home && (
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetAsHomeDashboard(dashboard.id);
+                          }}>
+                            <Home className="mr-2 h-4 w-4" />
+                            Set as Home
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem 
                           className="text-destructive"
                           onClick={(e) => {

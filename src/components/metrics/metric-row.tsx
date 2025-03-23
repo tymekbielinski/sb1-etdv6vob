@@ -10,9 +10,12 @@ interface MetricRowProps {
 export function MetricRow({ row, isDefault = false }: MetricRowProps) {
   const { definitions } = useMetricsStore();
   
+  // Ensure row.metrics is an array
+  const metricsArray = Array.isArray(row.metrics) ? row.metrics : [];
+  
   // Get metrics for this row
   const rowMetrics = definitions
-    .filter(def => row.metrics.includes(def.id))
+    .filter(def => metricsArray.includes(def.id))
     .sort((a, b) => a.order - b.order);
 
   return (

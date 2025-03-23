@@ -31,6 +31,8 @@ const DEFAULT_ACTIVITIES: ActivityType[] = [
 export default function Dashboard() {
   const { id: dashboardId } = useParams<{ id: string }>();
   const [isSaving, setIsSaving] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   // Initialize with this month as default
   const [dateRange, setDateRange] = useState<DateRange>(() => {
@@ -47,10 +49,13 @@ export default function Dashboard() {
   const { rows, addRow, addMetric } = useMetricsStore();
   const { 
     currentDashboard, 
+    homeDashboard,
     isLoading: dashboardLoading, 
     error: dashboardError, 
     fetchDashboard,
-    updateDashboard
+    fetchHomeDashboard,
+    updateDashboard,
+    setAsHomeDashboard
   } = useDashboardsStore();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -73,6 +78,11 @@ export default function Dashboard() {
           charts: useChartsStore.getState().charts
         }
       });
+      setHasUnsavedChanges(false);
+      toast({
+        title: 'Success',
+        description: 'Dashboard saved successfully',
+      });
     } catch (error) {
       console.error('Error saving dashboard:', error);
       toast({
@@ -82,6 +92,26 @@ export default function Dashboard() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Handle setting current dashboard as home dashboard
+  const handleSetAsHomeDashboard = async () => {
+    if (!currentDashboard || !dashboardId) return;
+
+    try {
+      await setAsHomeDashboard(dashboardId);
+      toast({
+        title: 'Success',
+        description: 'This dashboard is now your home dashboard',
+      });
+    } catch (error) {
+      console.error('Error setting home dashboard:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to set as home dashboard',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -96,6 +126,33 @@ export default function Dashboard() {
       });
     });
   }, [initializeTeam, toast]);
+
+  // Check if we need to redirect to the home dashboard
+  useEffect(() => {
+    if (!dashboardId && !isRedirecting) {
+      setIsRedirecting(true);
+      // Attempt to find and redirect to the home dashboard
+      fetchHomeDashboard().then((homeDashboard) => {
+        if (homeDashboard) {
+          navigate(`/dashboard/${homeDashboard.id}`);
+        } else {
+          // If no home dashboard exists, redirect to the dashboards list
+          navigate('/dashboards');
+        }
+      }).catch((error) => {
+        console.error('Failed to load home dashboard:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load home dashboard',
+          variant: 'destructive',
+        });
+        // If there's an error, redirect to the dashboards list
+        navigate('/dashboards');
+      }).finally(() => {
+        setIsRedirecting(false);
+      });
+    }
+  }, [dashboardId, fetchHomeDashboard, navigate, toast, isRedirecting]);
 
   // Load specific dashboard if ID is provided
   useEffect(() => {
@@ -122,20 +179,32 @@ export default function Dashboard() {
           useMetricsStore.getState().setDefinitions(config.metrics);
         }
         
-        // Set layout rows from dashboard config
+        // Set layout rows from dashboard config with safety check for metrics arrays
         if (config.layout) {
-          useMetricsStore.getState().setRows(config.layout);
+          // Ensure each row has a valid metrics array
+          const safeLayout = config.layout.map(row => ({
+            ...row,
+            metrics: Array.isArray(row.metrics) ? row.metrics : []
+          }));
+          useMetricsStore.getState().setRows(safeLayout);
         }
         
-        // Set activities if defined in config
+        // Set activities if defined in config with safety check
         if (config.activities) {
-          setSelectedActivities(config.activities);
+          setSelectedActivities(
+            Array.isArray(config.activities) 
+              ? config.activities 
+              : DEFAULT_ACTIVITIES
+          );
         }
 
         // Set charts if defined in config
         if (config.charts) {
           useChartsStore.getState().setCharts(config.charts);
         }
+        
+        // Reset unsaved changes flag after loading dashboard
+        setHasUnsavedChanges(false);
         
         // Fetch logs with the current date range
         fetchLogs(dateRange.from, dateRange.to).catch((error) => {
@@ -157,9 +226,30 @@ export default function Dashboard() {
     }
   }, [currentDashboard, fetchLogs, dateRange, toast]);
 
+  // Add event listeners for store changes to detect unsaved changes
   useEffect(() => {
-    return () => reset();
-  }, [reset]);
+    if (!currentDashboard) return;
+    
+    const unsubscribeMetrics = useMetricsStore.subscribe((state, prevState) => {
+      // Check if metrics or layout changed
+      if (state.definitions !== prevState.definitions || state.rows !== prevState.rows) {
+        setHasUnsavedChanges(true);
+      }
+    });
+    
+    const unsubscribeCharts = useChartsStore.subscribe((state, prevState) => {
+      // Check if charts changed
+      if (state.charts !== prevState.charts) {
+        setHasUnsavedChanges(true);
+      }
+    });
+    
+    return () => {
+      unsubscribeMetrics();
+      unsubscribeCharts();
+      reset();
+    };
+  }, [currentDashboard, reset]);
 
   // Fetch logs whenever filters change
   useEffect(() => {
@@ -172,8 +262,13 @@ export default function Dashboard() {
           variant: 'destructive',
         });
       });
+      
+      // Mark dashboard as having unsaved changes when date range changes
+      if (currentDashboard) {
+        setHasUnsavedChanges(true);
+      }
     }
-  }, [team?.id, dateRange, toast, fetchLogs]);
+  }, [team?.id, dateRange, toast, fetchLogs, currentDashboard]);
 
   const applyFilters = async () => {
     if (!team?.id) {
@@ -195,7 +290,7 @@ export default function Dashboard() {
 
   const metrics = calculateMetrics(activityData);
 
-  if (isLoading && !activityData.length) {
+  if ((isLoading || isRedirecting) && !activityData.length) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <LoadingSpinner size="lg" className="text-primary" />
@@ -223,6 +318,9 @@ export default function Dashboard() {
         dashboardTitle={currentDashboard?.title}
         isSaving={isSaving}
         onSave={handleSaveDashboard}
+        isHome={currentDashboard?.is_home}
+        onSetAsHome={handleSetAsHomeDashboard}
+        hasUnsavedChanges={hasUnsavedChanges}
       />
       <div className="flex flex-col gap-4">
         <div className="flex justify-between items-center">

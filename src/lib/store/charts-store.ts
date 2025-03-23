@@ -64,7 +64,14 @@ export const useChartsStore = create<ChartsState>()(
           charts: state.charts.filter((chart) => chart.id !== id),
         };
       }),
-      setCharts: (charts) => set({ charts }),
+      setCharts: (charts) => set({ 
+        charts: Array.isArray(charts) ? charts.map(chart => ({
+          id: chart.id || nanoid(),
+          title: chart.title || 'Activity Overview',
+          displayMode: Array.isArray(chart.displayMode) ? chart.displayMode : ['total'],
+          order: typeof chart.order === 'number' ? chart.order : 0
+        })) : []
+      }),
     }),
     {
       name: 'charts-storage',

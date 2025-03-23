@@ -142,8 +142,33 @@ export const useMetricsStore = create<MetricsState>()(
           }),
         };
       }),
-      setDefinitions: (definitions) => set({ definitions }),
-      setRows: (rows) => set({ rows }),
+      setDefinitions: (definitions) => set({ 
+        definitions: Array.isArray(definitions) ? definitions.map(def => ({
+          id: def.id || nanoid(),
+          type: ['total', 'conversion'].includes(def.type) ? def.type : 'total',
+          metrics: Array.isArray(def.metrics) ? def.metrics : [],
+          displayType: ['number', 'dollar', 'percent'].includes(def.displayType) ? def.displayType : 'number',
+          aggregation: ['sum', 'average', 'max', 'min'].includes(def.aggregation as string) ? def.aggregation : 'sum',
+          order: typeof def.order === 'number' ? def.order : 0,
+          rowId: def.rowId || 'default',
+          name: def.name || '',
+          description: def.description || ''
+        })) : []
+      }),
+      setRows: (rows) => set({ 
+        rows: Array.isArray(rows) ? rows.map(row => ({
+          id: row.id || nanoid(),
+          metrics: Array.isArray(row.metrics) ? row.metrics : [],
+          order: typeof row.order === 'number' ? row.order : 0,
+          height: typeof row.height === 'number' ? row.height : undefined
+        })) : [
+          {
+            id: 'default',
+            metrics: [],
+            order: 0,
+          }
+        ]
+      }),
     }),
     {
       name: 'metrics-storage',

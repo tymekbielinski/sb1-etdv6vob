@@ -8,6 +8,8 @@ export interface DashboardConfig {
     order?: number;
     height?: number;
   }[];
+  activities?: string[]; // Store selected activities
+  charts?: any[]; // Store chart configurations
 }
 
 export interface Dashboard {
@@ -17,6 +19,7 @@ export interface Dashboard {
   config: DashboardConfig;
   user_id?: string;
   team_id?: string;
+  is_home: boolean;
   version: number;
   created_at: string;
   updated_at: string;
@@ -40,6 +43,7 @@ export interface CreateDashboardParams {
   description?: string;
   config: DashboardConfig;
   team_id?: string; // If not provided, will be assigned to current user
+  is_home?: boolean; // Set to true to make this the home dashboard
 }
 
 export interface UpdateDashboardParams {
@@ -47,6 +51,7 @@ export interface UpdateDashboardParams {
   title?: string;
   description?: string;
   config?: DashboardConfig;
+  is_home?: boolean; // Set to true to make this the home dashboard
 }
 
 export interface CreateTemplateParams {

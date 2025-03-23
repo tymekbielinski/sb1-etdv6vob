@@ -80,7 +80,8 @@ export async function createDashboard(params: CreateDashboardParams): Promise<Da
         title: params.title,
         description: params.description,
         config: params.config,
-        user_id: user.id
+        user_id: user.id,
+        is_home: params.is_home || false
       })
       .select()
       .single();
@@ -95,7 +96,8 @@ export async function createDashboard(params: CreateDashboardParams): Promise<Da
         title: params.title,
         description: params.description,
         config: params.config,
-        team_id: params.team_id
+        team_id: params.team_id,
+        is_home: params.is_home || false
       })
       .select()
       .single();
@@ -114,6 +116,7 @@ export async function updateDashboard(params: UpdateDashboardParams): Promise<Da
   if (params.title !== undefined) updates.title = params.title;
   if (params.description !== undefined) updates.description = params.description;
   if (params.config !== undefined) updates.config = params.config;
+  if (params.is_home !== undefined) updates.is_home = params.is_home;
   
   const { data, error } = await supabase
     .from('dashboards')
