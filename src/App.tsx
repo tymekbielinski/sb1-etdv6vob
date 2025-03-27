@@ -6,6 +6,7 @@ import { AuthProvider } from '@/components/auth/auth-provider';
 import { AuthTabs } from '@/components/auth/auth-tabs';
 import { useAuth } from '@/components/auth/auth-provider';
 import { LoadingScreen } from '@/components/loading-screen';
+import { OnboardingContainer } from '@/components/onboarding/onboarding-container';
 
 // Lazy load components
 const Layout = lazy(() => import('@/components/layout'));
@@ -46,7 +47,9 @@ function AppRoutes() {
           path="/"
           element={
             <ProtectedRoute>
-              <Layout />
+              <OnboardingContainer>
+                <Layout />
+              </OnboardingContainer>
             </ProtectedRoute>
           }
         >

@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { LoadingScreen } from '@/components/loading-screen';
 import { useNavigate } from 'react-router-dom';
+import { signUp as signUpApi } from '@/lib/api/auth/signup';
 
 interface AuthContextType {
   user: User | null;
@@ -52,26 +53,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [navigate]);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    try {
+      const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        console.error('Sign-in error:', error.message, error.status);
+        throw error;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Unexpected sign-in error:', error);
+      throw error;
+    }
   };
 
   const signUp = async (email: string, password: string, name: string) => {
-    const { error: signUpError, data } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name },
-      },
-    });
-
-    if (signUpError) throw signUpError;
-    if (!data.user) throw new Error('Failed to create user');
-
-    // Wait briefly for the trigger to create the user profile
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    return data;
+    try {
+      // Use our modified sign-up implementation
+      const result = await signUpApi({ email, password, name });
+      return result;
+    } catch (error) {
+      console.error('Auth provider signup error:', error);
+      throw error;
+    }
   };
 
   const signOut = async () => {
