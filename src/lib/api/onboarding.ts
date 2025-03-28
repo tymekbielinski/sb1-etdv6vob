@@ -16,6 +16,7 @@ export async function createUserTeam(teamName: string, userEmail: string) {
       throw new Error('User not authenticated');
     }
     
+    // First check if user is an owner of any team
     const { data: existingTeams, error: teamQueryError } = await supabase
       .from('teams')
       .select('id, name')
@@ -32,6 +33,21 @@ export async function createUserTeam(teamName: string, userEmail: string) {
       return existingTeams[0];
     }
     
+    // Then check if user is a member of any team (using their email)
+    if (userData.user.email) {
+      const { data: memberTeams, error: memberError } = await supabase
+        .from('teams')
+        .select('id, name, team_members')
+        .contains('team_members', [userData.user.email]);
+      
+      if (memberError) {
+        console.error('Error checking team membership:', memberError);
+      } else if (memberTeams && memberTeams.length > 0) {
+        console.log(`User is already a member of team: ${memberTeams[0].name}`);
+        return memberTeams[0];
+      }
+    }
+    
     // Create the team
     const team = await createTeam(teamName, userEmail);
     console.log(`Team created for user: ${userEmail}`);
@@ -44,7 +60,7 @@ export async function createUserTeam(teamName: string, userEmail: string) {
 }
 
 /**
- * Checks if a user has any teams
+ * Checks if a user has any teams (either as owner or member)
  * @returns A promise that resolves to true if the user has at least one team, false otherwise
  */
 export async function userHasTeam(): Promise<boolean> {
@@ -55,17 +71,36 @@ export async function userHasTeam(): Promise<boolean> {
       return false;
     }
     
-    const { data: teams, error } = await supabase
+    // First check if user is an owner of any team
+    const { data: ownedTeams, error: ownedError } = await supabase
       .from('teams')
       .select('id')
       .eq('user_id', userData.user.id);
     
-    if (error) {
-      console.error('Error checking teams:', error);
-      return false;
+    if (ownedError) {
+      console.error('Error checking owned teams:', ownedError);
+    } else if (ownedTeams && ownedTeams.length > 0) {
+      console.log('User is an owner of teams:', ownedTeams.length);
+      return true;
     }
     
-    return teams && teams.length > 0;
+    // Then check if user is a member of any team (using their email)
+    if (userData.user.email) {
+      const { data: memberTeams, error: memberError } = await supabase
+        .from('teams')
+        .select('id, name, team_members')
+        .contains('team_members', [userData.user.email]);
+      
+      if (memberError) {
+        console.error('Error checking team membership:', memberError);
+      } else if (memberTeams && memberTeams.length > 0) {
+        console.log('User is a member of teams:', memberTeams.length);
+        return true;
+      }
+    }
+    
+    // User is neither an owner nor a member of any team
+    return false;
   } catch (error) {
     console.error('Error checking if user has team:', error);
     return false;
