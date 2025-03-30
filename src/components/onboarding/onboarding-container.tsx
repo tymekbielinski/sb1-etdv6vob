@@ -4,13 +4,15 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth/auth-provider';
 import { TeamOnboarding } from './team-onboarding';
 import { TemplateSelection } from './template-selection';
+import { TeamMembershipConfirmation } from './team-membership-confirmation';
 import { LoadingScreen } from '@/components/loading-screen';
-import { userHasTeam } from '@/lib/api/onboarding';
+import { userHasTeam, checkEmailInTeams } from '@/lib/api/onboarding';
 
 // Define the onboarding steps
 enum OnboardingStep {
   NONE,
   TEAM_CREATION,
+  TEAM_MEMBERSHIP_CONFIRMATION,
   TEMPLATE_SELECTION
 }
 
@@ -23,6 +25,7 @@ export function OnboardingContainer({ children }: OnboardingContainerProps) {
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
   const [hasTeam, setHasTeam] = useState(false);
+  const [pendingTeam, setPendingTeam] = useState<{ id: string; name: string } | null>(null);
   const [hasCompletedTemplateSelection, setHasCompletedTemplateSelection] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -66,6 +69,18 @@ export function OnboardingContainer({ children }: OnboardingContainerProps) {
         const hasUserTeam = await userHasTeam();
         console.log('User has team:', hasUserTeam);
         setHasTeam(hasUserTeam);
+        
+        // If user doesn't have a team, check if they've been invited to one
+        if (!hasUserTeam && user.email) {
+          const pendingTeamData = await checkEmailInTeams(user.email);
+          if (pendingTeamData) {
+            console.log('User has been invited to team:', pendingTeamData.name);
+            setPendingTeam({
+              id: pendingTeamData.id,
+              name: pendingTeamData.name
+            });
+          }
+        }
 
         // Check if user has any dashboards
         const { data: dashboards, error: dashboardError } = await supabase
@@ -93,8 +108,13 @@ export function OnboardingContainer({ children }: OnboardingContainerProps) {
         
         // Determine which onboarding step to show
         if (!hasUserTeam) {
-          console.log('Showing team creation step');
-          setCurrentStep(OnboardingStep.TEAM_CREATION);
+          if (pendingTeam) {
+            console.log('Showing team membership confirmation step');
+            setCurrentStep(OnboardingStep.TEAM_MEMBERSHIP_CONFIRMATION);
+          } else {
+            console.log('Showing team creation step');
+            setCurrentStep(OnboardingStep.TEAM_CREATION);
+          }
         } else if (!hasDashboards && !hasSelectedTemplate) {
           console.log('Showing template selection step');
           setCurrentStep(OnboardingStep.TEMPLATE_SELECTION);
@@ -117,6 +137,17 @@ export function OnboardingContainer({ children }: OnboardingContainerProps) {
     setHasTeam(true);
     setCurrentStep(OnboardingStep.TEMPLATE_SELECTION);
   };
+  
+  const handleTeamMembershipConfirm = () => {
+    setHasTeam(true);
+    setPendingTeam(null);
+    setCurrentStep(OnboardingStep.TEMPLATE_SELECTION);
+  };
+  
+  const handleTeamMembershipDecline = () => {
+    setPendingTeam(null);
+    setCurrentStep(OnboardingStep.TEAM_CREATION);
+  };
 
   const handleTemplateSelectionComplete = () => {
     // Mark template selection as completed
@@ -134,6 +165,21 @@ export function OnboardingContainer({ children }: OnboardingContainerProps) {
     return <LoadingScreen />;
   }
 
+  if (currentStep === OnboardingStep.TEAM_MEMBERSHIP_CONFIRMATION && pendingTeam) {
+    return (
+      <div className="container max-w-screen-xl mx-auto py-8 px-4">
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+          <TeamMembershipConfirmation
+            teamId={pendingTeam.id}
+            teamName={pendingTeam.name}
+            onConfirm={handleTeamMembershipConfirm}
+            onDecline={handleTeamMembershipDecline}
+          />
+        </div>
+      </div>
+    );
+  }
+  
   if (currentStep === OnboardingStep.TEAM_CREATION) {
     return (
       <div className="container max-w-screen-xl mx-auto py-8 px-4">

@@ -60,6 +60,38 @@ export async function createUserTeam(teamName: string, userEmail: string) {
 }
 
 /**
+ * Checks if an email is in any team's members list
+ * @param email The email to check
+ * @returns A promise that resolves to the team if found, null otherwise
+ */
+export async function checkEmailInTeams(email: string) {
+  try {
+    if (!email) return null;
+    
+    // Check if email is in any team's members list
+    const { data: teams, error } = await supabase
+      .from('teams')
+      .select('id, name, user_id, team_members')
+      .contains('team_members', [email]);
+    
+    if (error) {
+      console.error('Error checking email in teams:', error);
+      return null;
+    }
+    
+    if (teams && teams.length > 0) {
+      console.log(`Email ${email} found in team: ${teams[0].name}`);
+      return teams[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error checking email in teams:', error);
+    return null;
+  }
+}
+
+/**
  * Checks if a user has any teams (either as owner or member)
  * @returns A promise that resolves to true if the user has at least one team, false otherwise
  */

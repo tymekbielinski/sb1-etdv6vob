@@ -7,11 +7,19 @@ export function TeamRoster() {
   const { team, memberData } = useTeamStore();
   const members = team?.team_members || [];
 
-  const membersList = members.map(email => ({
-    email,
-    name: memberData[email]?.name || email.split('@')[0],
-    isOwner: team?.user_id === memberData[email]?.id
-  }));
+  // Safely create member objects with fallbacks for all properties
+  const membersList = members.map(email => {
+    // Ensure email is a string to prevent toLowerCase errors
+    const safeEmail = typeof email === 'string' ? email : '';
+    
+    return {
+      email: safeEmail,
+      // Provide fallback for name
+      name: memberData[safeEmail]?.name || safeEmail.split('@')[0] || 'Unknown',
+      // No owner check needed as per user's request
+      isOwner: false
+    };
+  });
 
   return (
     <Card>
