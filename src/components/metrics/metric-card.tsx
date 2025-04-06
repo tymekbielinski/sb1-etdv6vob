@@ -1,4 +1,4 @@
-import { Settings, Trash2 } from 'lucide-react';
+import { Settings, Trash2, MoreVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from '@/lib/utils';
 import { useMetricsStore, type MetricDefinition } from '@/lib/store/metrics-store';
 import { useDailyLogsStore } from '@/lib/store/daily-logs-store';
@@ -106,58 +112,79 @@ export function MetricCard({ title, value, className, metric, icon: Icon }: Metr
 
   return (
     <Card className={cn(
-      "relative group transition-colors hover:bg-accent/50",
+      "relative group transition-colors flex flex-col min-h-[150px] overflow-hidden",
       className
     )}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex items-center space-x-2">
-          {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
-          <h3 className="font-medium leading-none">{displayTitle}</h3>
-        </div>
-        {metric && (
-          <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={handleEdit}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 hover:bg-destructive/20 hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete this metric.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+      {/* Top Section: Header */}
+      <div 
+        className="p-3 transition-colors hover:bg-accent/20 cursor-pointer"
+        onClick={handleEdit}
+      >
+        <div className="flex items-center justify-between space-x-2">
+          {/* Left side: Icon and Title */}
+          <div className="flex items-center space-x-2 overflow-hidden">
+            {Icon && <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+            <h3 className="font-medium leading-none truncate" title={displayTitle}>{displayTitle}</h3>
           </div>
-        )}
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{displayValue}</div>
-      </CardContent>
+
+          {/* Right side: Actions Menu */}
+          {metric && (
+            <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+              <AlertDialog>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleEdit}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Edit</span>
+                    </DropdownMenuItem>
+                    <AlertDialogTrigger asChild>
+                       <DropdownMenuItem
+                         className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                         onSelect={(e) => e.preventDefault()} // Prevent closing dropdown
+                       >
+                         <Trash2 className="mr-2 h-4 w-4" />
+                         <span>Delete</span>
+                       </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Delete Confirmation Dialog */}
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete this metric.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-border/50"></div>
+
+      {/* Bottom Section: Value */}
+      <div className="flex flex-grow items-center justify-center p-4 transition-colors hover:bg-accent/30">
+        <div className="text-4xl font-bold">{displayValue}</div>
+      </div>
     </Card>
   );
 }

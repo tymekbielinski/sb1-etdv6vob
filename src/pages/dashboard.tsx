@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Phone, MessageSquare, Facebook, Linkedin, Instagram, Mail, BarChart3, Plus } from 'lucide-react';
+import { BarChart3, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MetricCard } from '@/components/metrics/metric-card';
 import { ChartContainer } from '@/components/charts/chart-container';
@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { calculateMetrics } from '@/lib/utils/metrics';
 import type { DateRange } from '@/lib/types';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CHART_COLORS } from '@/lib/constants/colors';
 
 // Define default activities
 const DEFAULT_ACTIVITIES: ActivityType[] = [
@@ -349,7 +350,7 @@ export default function Dashboard() {
             value={metrics.totalActivities.toString()}
             icon={BarChart3}
           />
-          {DEFAULT_ACTIVITIES.map(activityId => {
+          {DEFAULT_ACTIVITIES.map((activityId, index) => {
             const activity = team?.default_activities?.find(a => a.id === activityId) || {
               id: activityId,
               label: activityId.split('_').map(word => 
@@ -357,14 +358,15 @@ export default function Dashboard() {
               ).join(' ')
             };
 
-            const icon = {
-              cold_calls: Phone,
-              text_messages: MessageSquare,
-              facebook_dms: Facebook,
-              linkedin_dms: Linkedin,
-              instagram_dms: Instagram,
-              cold_emails: Mail
-            }[activityId];
+            const colorValues = Object.values(CHART_COLORS);
+            const color = colorValues[index % colorValues.length];
+
+            const ColorDotIcon = () => (
+              <div 
+                className="h-3 w-3 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+            );
 
             const value = {
               cold_calls: metrics.totalColdCalls,
@@ -380,7 +382,7 @@ export default function Dashboard() {
                 key={activityId}
                 title={activity.label}
                 value={value.toString()}
-                icon={icon}
+                icon={ColorDotIcon}
               />
             );
           })}
