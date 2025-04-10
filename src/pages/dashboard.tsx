@@ -18,6 +18,7 @@ import { calculateMetrics } from '@/lib/utils/metrics';
 import type { DateRange } from '@/lib/types';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CHART_COLORS } from '@/lib/constants/colors';
+import { EmptyState } from '@/components/common/EmptyState';
 
 // Define default activities
 const DEFAULT_ACTIVITIES: ActivityType[] = [
@@ -289,12 +290,50 @@ export default function Dashboard() {
     }
   };
 
-  const metrics = calculateMetrics(activityData);
+  const metrics = calculateMetrics(activityData || [], team?.team_members || []);
 
-  if ((isLoading || isRedirecting) && !activityData.length) {
+  // Handle loading state
+  if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <LoadingSpinner size="lg" className="text-primary" />
+      </div>
+    );
+  }
+
+  // Check for empty state *after* loading and error checks
+  if (!isLoading && !error && metrics.totalActivities === 0) {
+    return (
+      <div className="space-y-6">
+        <DashboardBreadcrumb
+          dashboardTitle={currentDashboard?.title}
+          isSaving={isSaving}
+          onSave={handleSaveDashboard}
+          isHome={currentDashboard?.is_home}
+          onSetAsHome={handleSetAsHomeDashboard}
+          hasUnsavedChanges={hasUnsavedChanges}
+        />
+        <div className="flex flex-col gap-4">
+           {/* Keep Filters and Title */}
+          <div className="flex justify-between items-center">
+             <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+           </div>
+           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+               <FilterControls
+                 dateRange={dateRange}
+                 setDateRange={setDateRange}
+                 onApplyFilters={applyFilters}
+               />
+               <ActivityFilter
+                 selectedActivities={selectedActivities}
+                 onSelectionChange={setSelectedActivities}
+               />
+             </div>
+           </div>
+        </div>
+        {/* Render Empty State instead of metrics/charts */}
+        <EmptyState />
       </div>
     );
   }
