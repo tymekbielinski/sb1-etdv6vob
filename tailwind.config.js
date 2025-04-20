@@ -81,4 +81,10 @@ export default {
     },
   },
   plugins: [require('tailwindcss-animate')],
+  safelist: [
+    // Safelist col-span classes for dynamic metric card width
+    {
+      pattern: /col-span-(2|3|4|5|6|7|8|9|10|11|12)/,
+    }
+  ]
 };

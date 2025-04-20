@@ -10,6 +10,7 @@ export interface MetricDefinition {
   aggregation?: 'sum' | 'average' | 'max' | 'min';
   order: number;
   rowId: string;
+  colSpan?: number; // Added: Column span for grid layout (default 3)
   name?: string;
   description?: string;
 }
@@ -55,6 +56,7 @@ export const useMetricsStore = create<MetricsState>()(
           id: nanoid(),
           rowId,
           order: row.metrics.length,
+          colSpan: 3, // Default colSpan for new metrics
           ...definition,
         };
 
@@ -118,6 +120,7 @@ export const useMetricsStore = create<MetricsState>()(
         // Update order property
         return {
           rows: newRows.map((r, i) => ({ ...r, order: i })),
+          // Note: reordering rows doesn't change metric colSpans
         };
       }),
       reorderMetrics: (rowId, fromIndex, toIndex) => set((state) => {
@@ -149,6 +152,7 @@ export const useMetricsStore = create<MetricsState>()(
           metrics: Array.isArray(def.metrics) ? def.metrics : [],
           displayType: ['number', 'dollar', 'percent'].includes(def.displayType) ? def.displayType : 'number',
           aggregation: ['sum', 'average', 'max', 'min'].includes(def.aggregation as string) ? def.aggregation : 'sum',
+          colSpan: typeof def.colSpan === 'number' && def.colSpan >= 2 && def.colSpan <= 12 ? def.colSpan : 3, // Validate and default colSpan
           order: typeof def.order === 'number' ? def.order : 0,
           rowId: def.rowId || 'default',
           name: def.name || '',
@@ -161,6 +165,7 @@ export const useMetricsStore = create<MetricsState>()(
           metrics: Array.isArray(row.metrics) ? row.metrics : [],
           order: typeof row.order === 'number' ? row.order : 0,
           height: typeof row.height === 'number' ? row.height : undefined
+          // Note: colSpan belongs to MetricDefinition, not MetricRow
         })) : [
           {
             id: 'default',

@@ -75,7 +75,7 @@ function App() {
       <Router>
         <AuthProvider>
           <AppRoutes />
-          <Toaster />
+          <Toaster position="top-right" />
         </AuthProvider>
       </Router>
     </ThemeProvider>

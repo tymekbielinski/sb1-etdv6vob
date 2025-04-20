@@ -25,3 +25,10 @@ export const THEME_COLORS = {
     secondary: '#A1A1A1',
   },
 } as const;
+
+// Colors for metric icons based on display type
+export const METRIC_ICON_COLORS = {
+  number: '#FF7F3E',    // Light orange
+  percent: '#80C4E9',   // Light blue
+  dollar: '#4335A7',    // Deep blue
+} as const;

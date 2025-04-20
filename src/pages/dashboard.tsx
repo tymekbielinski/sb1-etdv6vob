@@ -446,6 +446,8 @@ export default function Dashboard() {
                 key={row.id}
                 row={row}
                 isDefault={row.id === 'default'}
+                onReorder={() => setHasUnsavedChanges(true)}
+                onResize={() => setHasUnsavedChanges(true)}
               />
             ))}
         </div>
