@@ -65,6 +65,7 @@ export function DailyLogForm({ onLogUpdated, selectedDate }: DailyLogFormProps) 
       [key]: 0,
     }), {} as FormData),
   });
+  const { formState: { isDirty } } = form;
 
   useEffect(() => {
     async function loadDailyLog() {
@@ -125,6 +126,7 @@ export function DailyLogForm({ onLogUpdated, selectedDate }: DailyLogFormProps) 
       });
       
       onLogUpdated?.();
+      form.reset(values);
     } catch (error) {
       console.error('Error saving log:', error);
       toast({
@@ -142,11 +144,18 @@ export function DailyLogForm({ onLogUpdated, selectedDate }: DailyLogFormProps) 
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Activity Log for {format(selectedDate, 'PPP')}</span>
-          {lastUpdated && (
-            <span className="text-sm font-normal text-muted-foreground">
-              Last updated: {lastUpdated}
-            </span>
-          )}
+          <div className="flex items-center space-x-4">
+            {lastUpdated && (
+              <span className="text-sm font-normal text-muted-foreground">
+                Last updated: {lastUpdated}
+              </span>
+            )}
+            {isDirty && (
+              <span className="text-sm font-semibold text-red-600">
+                Unsaved changes
+              </span>
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>

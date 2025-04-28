@@ -22,8 +22,9 @@ interface EditableMetricCardProps {
 }
 
 // Global event bus for metric cards
-const SAVE_ALL_METRICS_EVENT = 'saveAllMetrics';
-const METRIC_EDIT_START_EVENT = 'metricEditStart';
+export const SAVE_ALL_METRICS_EVENT = 'saveAllMetrics';
+export const METRIC_EDIT_START_EVENT = 'metricEditStart';
+export const METRIC_SAVE_COMPLETE_EVENT = 'metricSaveComplete';
 
 export function EditableMetricCard({
   title,
@@ -126,8 +127,8 @@ export function EditableMetricCard({
   const saveValue = async (valueToSave: string) => {
     if (isSaving || valueToSave === displayValue) return;
 
+    setIsSaving(true);
     try {
-      setIsSaving(true);
       const numValue = Number(valueToSave);
       if (isNaN(numValue) || numValue < 0) {
         throw new Error('Invalid value');
@@ -137,6 +138,8 @@ export function EditableMetricCard({
       await onUpdate(metricId, valueToSave);
       setDisplayValue(valueToSave);
       setValue(valueToSave);
+      // Notify save completion
+      document.dispatchEvent(new CustomEvent(METRIC_SAVE_COMPLETE_EVENT, { detail: { metricId } }));
     } catch (error) {
       console.error('Error saving value:', error);
       setValue(displayValue); // Reset on error
@@ -275,7 +278,7 @@ export function EditableMetricCard({
                   handleDecrement();
                 }}
                 className="p-1 rounded-b-md bg-primary/10 hover:bg-primary/20 transition-colors"
-                disabled={isSaving || Number(displayValue) <= 0}
+                disabled={isSaving || Number(value) <= 0}
               >
                 <ChevronDown className="h-6 w-6 text-primary" />
               </button>

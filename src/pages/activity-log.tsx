@@ -1,16 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { EditableMetricCard } from '@/components/metrics/editable-metric-card';
 import { DatePickerDialog } from '@/components/activity-log/date-picker-dialog';
 import { useTeamStore } from '@/lib/store/team-store';
+import { UNSAFE_NavigationContext as NavigationContext } from 'react-router-dom';
 import { useAuth } from '@/components/auth/auth-provider';
 import { getDailyLog, createOrUpdateDailyLog } from '@/lib/api/daily-logs/mutations';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, MessageSquare, Facebook, Linkedin, Instagram, Mail, Plus, DollarSign } from 'lucide-react';
+import { Phone, MessageSquare, Facebook, Linkedin, Instagram, Mail, Plus, DollarSign, Save } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { SAVE_ALL_METRICS_EVENT, METRIC_EDIT_START_EVENT, METRIC_SAVE_COMPLETE_EVENT } from '@/components/metrics/editable-metric-card';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 const DEFAULT_ACTIVITIES = [
   { id: 'cold_calls', icon: Phone },
@@ -144,6 +147,59 @@ export default function ActivityLog() {
   const { team } = useTeamStore();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { navigator } = useContext(NavigationContext);
+  const [unsavedMetricIds, setUnsavedMetricIds] = useState<Set<string>>(new Set());
+  const hasUnsaved = unsavedMetricIds.size > 0;
+
+  useEffect(() => {
+    const handleEditStart = (e: CustomEvent) => {
+      setUnsavedMetricIds(prev => new Set(prev).add(e.detail.metricId));
+    };
+    const handleSaveComplete = (e: CustomEvent) => {
+      setUnsavedMetricIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(e.detail.metricId);
+        return newSet;
+      });
+    };
+    document.addEventListener(METRIC_EDIT_START_EVENT, handleEditStart as EventListener);
+    document.addEventListener(METRIC_SAVE_COMPLETE_EVENT, handleSaveComplete as EventListener);
+    return () => {
+      document.removeEventListener(METRIC_EDIT_START_EVENT, handleEditStart as EventListener);
+      document.removeEventListener(METRIC_SAVE_COMPLETE_EVENT, handleSaveComplete as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+      if (hasUnsaved) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    return () => { window.removeEventListener('beforeunload', beforeUnloadHandler); };
+  }, [hasUnsaved]);
+
+  useEffect(() => {
+    if (!navigator.block) return;
+    const unblockNav = navigator.block((tx: any) => {
+      if (!hasUnsaved) {
+        tx.retry();
+        return;
+      }
+      const confirmSave = window.confirm('You have unsaved changes. Save before leaving?');
+      if (confirmSave) {
+        document.dispatchEvent(new CustomEvent(SAVE_ALL_METRICS_EVENT));
+        setTimeout(() => tx.retry(), 300);
+      } else {
+        setUnsavedMetricIds(new Set());
+        unblockNav();
+        tx.retry();
+      }
+    });
+    return unblockNav;
+  }, [navigator, hasUnsaved]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -234,98 +290,124 @@ export default function ActivityLog() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Activity Log</h1>
-        <DatePickerDialog 
-          selectedDate={selectedDate} 
-          onDateSelect={setSelectedDate} 
-        />
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">Activity Log</h1>
+          <DatePickerDialog 
+            selectedDate={selectedDate} 
+            onDateSelect={setSelectedDate} 
+          />
+        </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant={hasUnsaved ? "default" : "outline"} 
+                size="sm" 
+                onClick={() => document.dispatchEvent(new CustomEvent(SAVE_ALL_METRICS_EVENT))} 
+                disabled={isLoading}
+                className={hasUnsaved ? "animate-pulse" : ""}
+              >
+                {isLoading 
+                  ? <><span className="animate-spin mr-2">⏳</span>Saving...</>
+                  : hasUnsaved 
+                    ? <><Save className="h-4 w-4 mr-2" />Save Changes</>
+                    : <><Save className="h-4 w-4 mr-2" />Saved</>
+                }
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {hasUnsaved ? "You have unsaved changes" : "All changes are saved"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
-
       <div className="space-y-8">
-        {/* Activities Section */}
         <div className="space-y-4">
-          <h2 className="text-lg font-medium">Activities</h2>
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-            {DEFAULT_ACTIVITIES.map(({ id, icon }) => {
-              const activity = team?.default_activities?.find(a => a.id === id) || {
-                id,
-                label: id.split('_').map(word => 
-                  word.charAt(0).toUpperCase() + word.slice(1)
-                ).join(' ')
-              };
+          {/* Activities Section */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-medium">Activities</h2>
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+              {DEFAULT_ACTIVITIES.map(({ id, icon }) => {
+                const activity = team?.default_activities?.find(a => a.id === id) || {
+                  id,
+                  label: id.split('_').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1)
+                  ).join(' ')
+                };
 
-              return (
+                return (
+                  <EditableMetricCard
+                    key={id}
+                    title={activity.label}
+                    icon={icon}
+                    metricId={id}
+                    selectedDate={selectedDate}
+                    onUpdate={handleMetricUpdate}
+                    isLoading={isLoading}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Deals Won Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium">Deals Won</h2>
+              {metrics.deals_won === 0 && metrics.deal_value === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Click "Add New Won Deal" to record your first deal
+                </p>
+              )}
+            </div>
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+              <DealEntryModal
+                selectedDate={selectedDate}
+                onDealAdded={() => setRefreshKey(prev => prev + 1)}
+              />
+              <EditableMetricCard
+                title="Total Deals Won"
+                value={metrics.deals_won.toString()}
+                metricId="deals_won"
+                selectedDate={selectedDate}
+                onUpdate={handleMetricUpdate}
+                isLoading={isLoading}
+                disabled={metrics.deals_won === 0}
+              />
+              <EditableMetricCard
+                title="Total Deal Value"
+                value={formatCurrency(metrics.deal_value)}
+                metricId="deal_value"
+                selectedDate={selectedDate}
+                onUpdate={handleMetricUpdate}
+                isLoading={isLoading}
+                displayType="currency"
+                disabled={metrics.deal_value === 0}
+              />
+            </div>
+          </div>
+
+          {/* Funnel Metrics Section */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-medium">Funnel Metrics</h2>
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+              {FUNNEL_METRICS.map(({ id, label, icon }) => (
                 <EditableMetricCard
                   key={id}
-                  title={activity.label}
-                  icon={icon}
+                  title={label}
                   metricId={id}
                   selectedDate={selectedDate}
                   onUpdate={handleMetricUpdate}
                   isLoading={isLoading}
+                  icon={icon}
                 />
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Deals Won Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium">Deals Won</h2>
-            {metrics.deals_won === 0 && metrics.deal_value === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Click "Add New Won Deal" to record your first deal
-              </p>
-            )}
-          </div>
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-            <DealEntryModal
-              selectedDate={selectedDate}
-              onDealAdded={() => setRefreshKey(prev => prev + 1)}
-            />
-            <EditableMetricCard
-              title="Total Deals Won"
-              value={metrics.deals_won.toString()}
-              metricId="deals_won"
-              selectedDate={selectedDate}
-              onUpdate={handleMetricUpdate}
-              isLoading={isLoading}
-              disabled={metrics.deals_won === 0}
-            />
-            <EditableMetricCard
-              title="Total Deal Value"
-              value={formatCurrency(metrics.deal_value)}
-              metricId="deal_value"
-              selectedDate={selectedDate}
-              onUpdate={handleMetricUpdate}
-              isLoading={isLoading}
-              displayType="currency"
-              disabled={metrics.deal_value === 0}
-            />
-          </div>
-        </div>
-
-        {/* Funnel Metrics Section */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-medium">Funnel Metrics</h2>
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-            {FUNNEL_METRICS.map(({ id, label, icon }) => (
-              <EditableMetricCard
-                key={id}
-                title={label}
-                metricId={id}
-                selectedDate={selectedDate}
-                onUpdate={handleMetricUpdate}
-                isLoading={isLoading}
-                icon={icon}
-              />
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
