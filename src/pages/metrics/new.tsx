@@ -25,27 +25,34 @@ export default function NewMetric() {
         throw new Error('No dashboard selected');
       }
 
-      if (existingMetric) {
-        // Update existing metric
-        updateMetric(existingMetric.id, definition);
+      // Always add the metric as a new one
+      // Add a new row if we don't have any
+      // Note: This simplification always adds to the first row. 
+      // Consider adding logic to add to the same row as existingMetric if needed.
+      if (rows.length === 0) {
+        addRow();
+      }
+      // Ensure rows state is updated before accessing rows[0]
+      const currentRows = useMetricsStore.getState().rows;
+      const targetRow = currentRows[0]; 
+      if (targetRow) {
+        addMetric(targetRow.id, definition);
       } else {
-        // Add a new row if we don't have any
-        if (rows.length === 0) {
-          addRow();
-        }
-        // The metric will be added to the first row by default
-        const firstRow = rows[0];
-        if (firstRow) {
-          addMetric(firstRow.id, definition);
-        }
+        // Handle case where row couldn't be created or found
+        console.error('Could not find or create a row to add the metric to.');
+        throw new Error('Failed to determine target row for the metric.');
       }
 
       // Save the dashboard with updated metrics
+      // Ensure we get the latest state after addMetric potentially updated it
+      const updatedDefinitions = useMetricsStore.getState().definitions;
+      const updatedRows = useMetricsStore.getState().rows;
+
       await updateDashboard({
         id: dashboardId,
         config: {
-          metrics: useMetricsStore.getState().definitions,
-          layout: useMetricsStore.getState().rows,
+          metrics: updatedDefinitions,
+          layout: updatedRows,
           activities: currentDashboard?.config.activities || [],
           charts: currentDashboard?.config.charts || []
         }
@@ -56,7 +63,7 @@ export default function NewMetric() {
 
       toast({
         title: 'Success',
-        description: existingMetric ? 'Metric updated successfully' : 'Metric created successfully',
+        description: 'Metric created successfully', // Always show created message
       });
       
       // Navigate back to the specific dashboard

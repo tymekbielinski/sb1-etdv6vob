@@ -7,17 +7,21 @@ export interface MetricDefinition {
   type: 'total' | 'conversion';
   metrics: string[];
   displayType: 'number' | 'dollar' | 'percent';
+  displayMode?: 'number' | 'chart_total' | 'chart_team' | 'chart_metric';
   aggregation?: 'sum' | 'average' | 'max' | 'min';
   order: number;
   rowId: string;
-  colSpan?: number; // Added: Column span for grid layout (default 3)
+  colSpan?: number; 
   name?: string;
   description?: string;
+  unit?: 'number' | 'dollar' | 'percent';
+  numerator?: string; 
+  denominator?: string;
 }
 
 export interface MetricRow {
   id: string;
-  metrics: string[]; // Array of metric IDs
+  metrics: string[]; 
   order: number;
   height?: number;
 }
@@ -56,7 +60,7 @@ export const useMetricsStore = create<MetricsState>()(
           id: nanoid(),
           rowId,
           order: row.metrics.length,
-          colSpan: 3, // Default colSpan for new metrics
+          colSpan: 3, 
           ...definition,
         };
 
@@ -99,10 +103,8 @@ export const useMetricsStore = create<MetricsState>()(
         rows: state.rows.map(r => r.id === id ? { ...r, ...updates } : r),
       })),
       removeRow: (id) => set((state) => {
-        // Don't remove the last row
         if (state.rows.length <= 1) return state;
 
-        // Remove all metrics in this row
         const metricsToRemove = state.definitions
           .filter(d => d.rowId === id)
           .map(d => d.id);
@@ -117,10 +119,8 @@ export const useMetricsStore = create<MetricsState>()(
         const [movedRow] = newRows.splice(fromIndex, 1);
         newRows.splice(toIndex, 0, movedRow);
 
-        // Update order property
         return {
           rows: newRows.map((r, i) => ({ ...r, order: i })),
-          // Note: reordering rows doesn't change metric colSpans
         };
       }),
       reorderMetrics: (rowId, fromIndex, toIndex) => set((state) => {
@@ -131,7 +131,6 @@ export const useMetricsStore = create<MetricsState>()(
         const [movedMetricId] = newMetricIds.splice(fromIndex, 1);
         newMetricIds.splice(toIndex, 0, movedMetricId);
 
-        // Update rows and metric orders
         return {
           rows: state.rows.map(r => 
             r.id === rowId 
@@ -151,12 +150,16 @@ export const useMetricsStore = create<MetricsState>()(
           type: ['total', 'conversion'].includes(def.type) ? def.type : 'total',
           metrics: Array.isArray(def.metrics) ? def.metrics : [],
           displayType: ['number', 'dollar', 'percent'].includes(def.displayType) ? def.displayType : 'number',
+          displayMode: ['number', 'chart_total', 'chart_team', 'chart_metric'].includes(def.displayMode as string) ? def.displayMode : 'number',
           aggregation: ['sum', 'average', 'max', 'min'].includes(def.aggregation as string) ? def.aggregation : 'sum',
-          colSpan: typeof def.colSpan === 'number' && def.colSpan >= 2 && def.colSpan <= 12 ? def.colSpan : 3, // Validate and default colSpan
+          colSpan: typeof def.colSpan === 'number' && def.colSpan >= 2 && def.colSpan <= 12 ? def.colSpan : 3, 
           order: typeof def.order === 'number' ? def.order : 0,
           rowId: def.rowId || 'default',
           name: def.name || '',
-          description: def.description || ''
+          description: def.description || '',
+          unit: def.unit || undefined,
+          numerator: def.numerator || undefined,
+          denominator: def.denominator || undefined,
         })) : []
       }),
       setRows: (rows) => set({ 
@@ -165,7 +168,6 @@ export const useMetricsStore = create<MetricsState>()(
           metrics: Array.isArray(row.metrics) ? row.metrics : [],
           order: typeof row.order === 'number' ? row.order : 0,
           height: typeof row.height === 'number' ? row.height : undefined
-          // Note: colSpan belongs to MetricDefinition, not MetricRow
         })) : [
           {
             id: 'default',

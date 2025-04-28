@@ -48,7 +48,7 @@ export default function Dashboard() {
   const { team, initialize: initializeTeam } = useTeamStore();
   const { data: activityData, isLoading: logsLoading, error: logsError, fetchLogs, reset } = useDailyLogsStore();
   const { charts, addChart } = useChartsStore();
-  const { rows, addRow, addMetric } = useMetricsStore();
+  const { rows, definitions, addRow, addMetric } = useMetricsStore();
   const { 
     currentDashboard, 
     homeDashboard,
@@ -448,6 +448,8 @@ export default function Dashboard() {
                 isDefault={row.id === 'default'}
                 onReorder={() => setHasUnsavedChanges(true)}
                 onResize={() => setHasUnsavedChanges(true)}
+                chartData={activityData}
+                selectedActivities={selectedActivities}
               />
             ))}
         </div>

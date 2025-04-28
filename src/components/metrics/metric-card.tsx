@@ -1,4 +1,4 @@
-import { Settings, Trash2, MoreVertical, Hash, Percent, DollarSign } from 'lucide-react';
+import { Settings, Trash2, MoreVertical, Hash, Percent, DollarSign, LineChart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,9 @@ import { METRIC_ICON_COLORS } from '@/lib/constants/colors'; // Re-import metric
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { ActivityChart } from '@/components/charts/activity-chart'; // Correct the import path for ActivityChart
+import type { ActivityType } from '@/components/dashboard/activity-filter';
+import type { DailyLogData } from '@/lib/api/daily-logs/queries';
 
 interface MetricCardProps {
   id: string; // Required for dnd-kit
@@ -39,6 +42,10 @@ interface MetricCardProps {
   onResize?: () => void; // Callback when resize finishes
   isDraggable?: boolean; // If false, dnd/resize logic is disabled
   isOver?: boolean; // If true, indicates an item is being dragged over this card
+  // New props for chart support
+  displayMode?: 'number' | 'chart';
+  chartData?: DailyLogData[]; // Use specific type
+  selectedActivities?: ActivityType[]; // Use specific type
 }
 
 export function MetricCard({
@@ -51,7 +58,15 @@ export function MetricCard({
   onResize,
   isDraggable = false, // Default to false
   isOver = false, // Default to false
+  displayMode,
+  chartData,
+  selectedActivities,
 }: MetricCardProps) {
+  if (!metric) {
+    console.error(`MetricCard (id: ${id}) received undefined 'metric' prop. Rendering null.`);
+    return null;
+  }
+
   const { removeMetric, updateMetric } = useMetricsStore();
   const { data: activityData } = useDailyLogsStore();
   const navigate = useNavigate();
@@ -216,27 +231,48 @@ export function MetricCard({
   let IconComponent: React.ElementType | null = Icon; // Start with passed icon if available
   let iconColorHex: string | null = null; // Hex color for custom types
 
-  if (!IconComponent && metric?.displayType) { // If no passed icon, check displayType
-    switch (metric.displayType) {
-      case 'number':
-        IconComponent = Hash;
-        iconColorHex = METRIC_ICON_COLORS.number;
-        break;
-      case 'percent': 
-        IconComponent = Percent;
-        iconColorHex = METRIC_ICON_COLORS.percent;
-        break;
-      case 'dollar':
-        IconComponent = DollarSign;
-        iconColorHex = METRIC_ICON_COLORS.dollar;
+  if (!IconComponent && metric?.displayMode) { // If no passed icon, check displayMode
+    switch (metric.displayMode) {
+      case 'chart':
+        IconComponent = LineChart;
         break;
       default:
-        IconComponent = null;
+        // Fallback to displayType logic (assuming this mapping exists)
+        switch (metric.displayType) {
+          case 'number':
+            IconComponent = Hash;
+            iconColorHex = METRIC_ICON_COLORS.number;
+            break;
+          case 'percent': 
+            IconComponent = Percent;
+            iconColorHex = METRIC_ICON_COLORS.percent;
+            break;
+          case 'dollar':
+            IconComponent = DollarSign;
+            iconColorHex = METRIC_ICON_COLORS.dollar;
+            break;
+          default:
+            IconComponent = null;
+        }
     }
   }
 
+  // Determine if the card should display a chart
+  const isChartMode = metric.displayMode?.startsWith('chart_') ?? false;
+
+  // Prepare conversion metric prop if applicable
+  const conversionMetricProp = 
+    isChartMode && metric.type === 'conversion' && metric.metrics?.length === 2
+      ? { numerator: metric.metrics[0] as ActivityType, denominator: metric.metrics[1] as ActivityType }
+      : undefined;
+
+  // Prepare selected activities for non-conversion charts
+  const selectedActivitiesProp = 
+    isChartMode && metric.type !== 'conversion' 
+      ? (metric?.metrics as ActivityType[]) || [] 
+      : []; // Pass empty array if not a relevant chart type
+
   return (
-    // Main Card Div
     <div
       ref={(node) => {
         setNodeRef(node);
@@ -372,10 +408,23 @@ export function MetricCard({
         {/* Divider */}
         <div className="border-t border-border/50"></div>
 
-        {/* Bottom Section: Value */}
-        <div className="flex flex-grow items-center justify-center p-4 transition-colors hover:bg-accent/30">
-          <div className="text-4xl font-bold">{displayValue}</div>
-        </div>
+        {/* Bottom Section: Value or Chart */}
+        {isChartMode && chartData ? (
+          <div className="flex-grow p-2 min-h-[200px]"> 
+            <ActivityChart 
+              data={chartData} 
+              selectedActivities={selectedActivitiesProp} 
+              // Pass the correct breakdown type directly from metric.displayMode
+              displayMode={metric.displayMode} 
+              showLegend={false} 
+              conversionMetric={conversionMetricProp} 
+            />
+          </div>
+        ) : (
+          <div className="flex flex-grow items-center justify-center p-4 transition-colors hover:bg-accent/30">
+            <div className="text-4xl font-bold">{displayValue}</div>
+          </div>
+        )}
       </div>
   );
 }
@@ -410,13 +459,26 @@ function calculateMetricValue(metric: MetricDefinition, data: any[]): number {
         return 0;
     }
   } else if (metric.type === 'conversion') {
-    const [numerator, denominator] = metric.metrics;
-    const totalNumerator = data.reduce((sum, day) => sum + (day[numerator] || 0), 0);
-    const totalDenominator = data.reduce((sum, day) => sum + (day[denominator] || 0), 0);
+    // Use numerator and denominator properties consistent with MetricBuilder & ActivityChart props
+    const numerator = metric.numerator;
+    const denominator = metric.denominator;
+    if (!numerator || !denominator) {
+      console.warn(`MetricCard (id: ${metric.id}): Conversion metric missing numerator or denominator.`);
+      return 0;
+    }
+    const totalNumerator = data.reduce((sum, day) => sum + (safeNumber(day[numerator])), 0);
+    const totalDenominator = data.reduce((sum, day) => sum + (safeNumber(day[denominator])), 0);
     return totalDenominator ? totalNumerator / totalDenominator : 0;
   }
 
   return 0;
+}
+
+// Helper function to safely convert values to numbers
+function safeNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
 }
 
 function getMetricTitle(metric: MetricDefinition): string {
@@ -424,11 +486,18 @@ function getMetricTitle(metric: MetricDefinition): string {
     return metric.name;
   }
   
-  if (metric.type === 'total') {
-    const metricNames = metric.metrics.map(m => getMetricLabel(m));
+  if (metric.type === 'activity') {
+    const metricNames = metric.activities?.map(m => getMetricLabel(m)) || ['Unknown Activity'];
     return `Total ${metricNames.join(' + ')}`;
-  } else {
-    const [numerator, denominator] = metric.metrics;
-    return `${getMetricLabel(numerator)} / ${getMetricLabel(denominator)}`;
+  } else if (metric.type === 'conversion') {
+    // Use numerator and denominator properties
+    const numLabel = metric.numerator ? getMetricLabel(metric.numerator) : 'Unknown';
+    const denLabel = metric.denominator ? getMetricLabel(metric.denominator) : 'Unknown';
+    return `${numLabel} / ${denLabel}`;
+  } else if (metric.type === 'opportunity') {
+    return `Opportunity: ${metric.opportunityStage || 'Unknown Stage'}`;
   }
+
+  // Fallback for unknown types or missing data
+  return metric.id; 
 }

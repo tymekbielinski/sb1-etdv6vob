@@ -3,6 +3,7 @@ export const CHART_COLORS = {
   secondary: '#FFF6E9',  // Light cream
   tertiary: '#80C4E9',   // Light blue
   quaternary: '#FF7F3E', // Light orange
+  conversion: '#4335A7', // Deep blue (matches primary)
 } as const;
 
 export const MEMBER_COLORS = [

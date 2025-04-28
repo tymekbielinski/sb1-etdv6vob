@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, RefreshCw, Filter, CalendarIcon, X } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, RefreshCw, CalendarIcon, X, Check, Settings, Hash, LineChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tabs,
@@ -29,7 +29,9 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { MetricSelector } from '@/components/metrics/metric-selector';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
-import { startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
+import { ActivityChart } from '@/components/charts/activity-chart';
 
 const AVAILABLE_METRICS = [
   { value: 'cold_calls', label: 'Cold Calls' },
@@ -58,15 +60,17 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
   const [metricName, setMetricName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
-  const [displayType, setDisplayType] = useState<'number' | 'dollar' | 'percent'>(
-    existingMetric?.displayType || (activeTab === 'conversions' ? 'percent' : 'number')
-  );
+  const [displayMode, setDisplayMode] = useState<'number' | 'chart'>('number');
+  const [unit, setUnit] = useState<'number' | 'dollar' | 'percent'>('number');
+  const [chartType, setChartType] = useState<'chart_total' | 'chart_team' | 'chart_metric'>('chart_total');
   const [aggregation, setAggregation] = useState<'sum' | 'average' | 'max' | 'min'>('sum');
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const today = new Date();
+    const firstDayOfMonth = startOfMonth(today);
+    const lastDayOfMonth = endOfMonth(today);
     return { 
-      from: startOfDay(today),
-      to: endOfDay(today)
+      from: firstDayOfMonth,
+      to: lastDayOfMonth
     };
   });
   const [metricValue, setMetricValue] = useState<number | null>(null);
@@ -111,7 +115,7 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
       id: existingMetric?.id || 'temp',
       type: activeTab === 'totals' ? 'total' : 'conversion',
       metrics: selectedMetrics,
-      displayType,
+      displayType: unit,
       aggregation: activeTab === 'totals' ? aggregation : undefined,
       order: existingMetric?.order || 0,
       rowId: existingMetric?.rowId || 'temp',
@@ -124,7 +128,8 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
   // Initialize form with existing metric data if provided
   useEffect(() => {
     if (existingMetric) {
-      setActiveTab(existingMetric.type === 'total' ? 'totals' : 'conversions');
+      const isConversion = existingMetric.type === 'conversion';
+      setActiveTab(isConversion ? 'conversions' : 'totals');
       setSelectedMetrics(existingMetric.metrics);
       if (existingMetric.aggregation) {
         setAggregation(existingMetric.aggregation);
@@ -135,13 +140,26 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
       if (existingMetric.description) {
         setDescription(existingMetric.description);
       }
+      
+      // Set display mode and chart type
+      if (existingMetric.displayMode === 'number') {
+        setDisplayMode('number');
+      } else if (existingMetric.displayMode.startsWith('chart_')) {
+        setDisplayMode('chart');
+        setChartType(existingMetric.displayMode as typeof chartType);
+      } else {
+        setDisplayMode('number'); // Default
+      }
+
+      // Explicitly set unit based on metric type for existing metrics
+      setUnit(isConversion ? 'percent' : (existingMetric.unit || 'number'));
     }
   }, [existingMetric]);
 
   // Update display type when tab changes
   useEffect(() => {
     if (!existingMetric) {
-      setDisplayType(activeTab === 'conversions' ? 'percent' : 'number');
+      setUnit(activeTab === 'conversions' ? 'percent' : 'number');
     }
   }, [activeTab, existingMetric]);
 
@@ -164,26 +182,37 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
       return;
     }
 
-    if (activeTab === 'conversions' && selectedMetrics.length !== 2) {
+    const metricType = activeTab === 'totals' ? 'total' : 'conversion';
+
+    if (metricType === 'conversion' && selectedMetrics.length !== 2) {
       toast({
         title: "Error",
-        description: "Please select exactly two metrics for conversion calculation",
+        description: "Please select exactly two metrics for conversion calculation (numerator first, then denominator)",
         variant: "destructive",
       });
       return;
     }
 
-    const metricType = activeTab === 'totals' ? 'total' : 'conversion';
-    const metricDisplayType = metricType === 'conversion' ? 'percent' : displayType;
+    const finalUnit = metricType === 'conversion' ? 'percent' : unit;
+    const metricDisplayMode = displayMode === 'chart' ? chartType : 'number';
 
-    onSave({
+    const metricToSave: Omit<MetricDefinition, 'id' | 'order' | 'rowId'> = {
       type: metricType,
       metrics: selectedMetrics,
-      displayType: metricDisplayType,
+      displayType: finalUnit,
+      displayMode: metricDisplayMode,
       aggregation: metricType === 'total' ? aggregation : undefined,
       name: metricName || undefined,
       description: description || undefined,
-    });
+    };
+
+    // Add numerator and denominator for conversion metrics
+    if (metricType === 'conversion') {
+      metricToSave.numerator = selectedMetrics[0];
+      metricToSave.denominator = selectedMetrics[1];
+    }
+
+    onSave(metricToSave);
 
     // Navigate to dashboard
     navigate('/');
@@ -197,6 +226,22 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
     const defaultMetric = AVAILABLE_METRICS.find(m => m.value === metricId);
     return defaultMetric?.label || metricId;
   };
+
+  // Memoize conversionMetric prop for chart
+  const chartConversionMetric = useMemo(() => {
+    if (activeTab === 'conversions' && selectedMetrics.length === 2) {
+      return { numerator: selectedMetrics[0], denominator: selectedMetrics[1] };
+    }
+    return undefined; // Important: Undefined for non-conversion types
+  }, [activeTab, selectedMetrics]);
+
+  // Memoize selectedActivities prop for chart
+  const chartSelectedActivities = useMemo(() => {
+    if (activeTab === 'totals') {
+      return selectedMetrics;
+    }
+    return undefined; // Important: Undefined for conversion types
+  }, [activeTab, selectedMetrics]);
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -287,56 +332,129 @@ export function MetricBuilder({ onSave, existingMetric }: MetricBuilderProps) {
                     </Select>
                   </div>
                 )}
-
-                <Button variant="outline" size="icon" className="shrink-0 h-10 w-10">
-                  <Filter className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           </Card>
 
           {/* Metric Visualization Section */}
           <Card className="p-6 border border-input/20">
-            <div className="flex justify-between items-start mb-8">
-              <DatePickerWithRange
-                date={dateRange}
-                setDate={setDateRange}
-              />
-            </div>
-            <div className="flex flex-col items-center gap-12">
-              {/* Large Metric Display */}
-              <div className="flex items-center justify-center min-h-[120px]">
-                {isActivityLoading ? (
-                  <LoadingSpinner className="w-12 h-12" />
-                ) : metricValue !== null ? (
-                  <span className="text-7xl font-semibold tracking-tight">
-                    {formatMetricValue(metricValue, displayType)}
-                  </span>
-                ) : (
-                  <span className="text-3xl text-muted-foreground">
-                    Select metrics to preview
-                  </span>
-                )}
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-2">
+                <DatePickerWithRange
+                  date={dateRange}
+                  setDate={setDateRange}
+                />
               </div>
 
-              {/* Display Type Selector */}
-              <div className="w-full max-w-[200px]">
-                <Select
-                  value={displayType}
-                  onValueChange={(value: 'number' | 'dollar' | 'percent') =>
-                    setDisplayType(value)
-                  }
+              <div className="flex items-center space-x-4">
+                {/* Options Dropdown Menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-[110px]">
+                      <Settings className="mr-2 h-4 w-4" /> Options
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Metric Options</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    
+                    {/* Unit Selection Group - Only show for non-conversion metrics */}
+                    {activeTab !== 'conversions' && (
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel className="text-xs text-muted-foreground px-2">Unit</DropdownMenuLabel>
+                        <DropdownMenuItem onSelect={() => setUnit('number')}>
+                          <span className="flex-grow">Number</span>
+                          {unit === 'number' && <Check className="ml-2 h-4 w-4" />} 
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setUnit('dollar')}>
+                          <span className="flex-grow">Currency ($)</span>
+                          {unit === 'dollar' && <Check className="ml-2 h-4 w-4" />} 
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setUnit('percent')}>
+                          <span className="flex-grow">Percentage (%)</span>
+                          {unit === 'percent' && <Check className="ml-2 h-4 w-4" />} 
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
+                    )}
+
+                    {/* Breakdown Selection - Show for Activity AND Conversion */}
+                    {(activeTab === 'totals' || activeTab === 'conversions') && (
+                      <>
+                        <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">Breakdown by</DropdownMenuLabel>
+                        {/* Restore Radio Group structure */}
+                        <DropdownMenuRadioGroup value={chartType} onValueChange={(value) => setChartType(value as 'chart_total' | 'chart_team' | 'chart_metric')}>
+                          {/* Total: Always show if group is visible */}
+                          <DropdownMenuRadioItem value="chart_total">Total</DropdownMenuRadioItem>
+                          {/* Team & Metric: Only show for 'activity' type */}
+                          {activeTab === 'totals' && (
+                            <>
+                              <DropdownMenuRadioItem value="chart_team">Team</DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="chart_metric">Metric</DropdownMenuRadioItem>
+                            </>
+                          )}
+                        </DropdownMenuRadioGroup>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Simplified Display Mode Select (No Label) */}
+                <Select 
+                  value={displayMode} 
+                  onValueChange={(value: 'number' | 'chart') => setDisplayMode(value)}
                 >
-                  <SelectTrigger id="displayType">
-                    <SelectValue placeholder="Select display type" />
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="Select mode" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="number">Number</SelectItem>
-                    <SelectItem value="dollar">Currency ($)</SelectItem>
-                    <SelectItem value="percent">Percentage (%)</SelectItem>
+                    <SelectItem value="number">
+                      <div className="flex items-center">
+                        <Hash className="mr-2 h-4 w-4" />
+                        <span>Number</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="chart">
+                      <div className="flex items-center">
+                        <LineChart className="mr-2 h-4 w-4" />
+                        <span>Chart</span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="flex flex-col items-center justify-center min-h-[250px] p-4 bg-muted/40 rounded-md border border-dashed">
+              {/* Show Numeric Value ONLY if mode is 'number' */}
+              {displayMode === 'number' && (
+                <span className="text-5xl font-semibold tracking-tight">
+                  {isActivityLoading ? <LoadingSpinner size="large"/> : formatMetricValue(metricValue, unit)}
+                </span>
+              )}
+              
+              {/* Show Chart ONLY if mode is 'chart' */}
+              {displayMode === 'chart' && (
+                <div className="w-full h-full min-h-[230px]"> {/* Ensure container takes space */}
+                  {isActivityLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <LoadingSpinner size="large" />
+                    </div>
+                  ) : activityData ? (
+                    <ActivityChart
+                      data={activityData}
+                      selectedActivities={chartSelectedActivities}
+                      displayMode={chartType} 
+                      showLegend={false} // Keep preview clean
+                      conversionMetric={chartConversionMetric} 
+                      // Add a flag to potentially disable internal padding/margins if needed for preview
+                      // isPreview={true} 
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      No data available for preview.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </Card>
         </div>
